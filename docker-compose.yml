@@ -1,0 +1,21 @@
+services:
+  db:
+    container_name: laravelMySQL
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes: 
+      - mySql:/var/lib/mysql
+    networks:
+      - journalObservationAgronomic
+
+volumes:
+  mySql:
+
+networks:
+  journalObservationAgronomic:
