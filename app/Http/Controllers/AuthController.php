@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Redis;
 
 class AuthController extends Controller
 {
@@ -18,16 +19,16 @@ class AuthController extends Controller
     private function handleLogin(Request $request)
     {
         $request->validate([
-            'login' => 'required|string|min:3',
+            'username' => 'required|string|min:3',
             'password' => 'required|string|min:6'
         ]);
 
-        $login = $request->input('login');
-        $password = $request->input('password');
+        $credentials = $request->only('username', 'password');
 
-        // Временная проверка
-        if ($login === 'admin' && $password === 'password123') {
-            return back()->with('success', 'Авторизация прошла успешно: ' . $login);
+        if(Auth::attempt($credentials)){
+            $request->session()->regenerate();
+
+            return redirect('/')->with('success', 'Вход успешно выполнен!');
         }
 
         return back()->with('error', 'Неверный логин или пароль');
@@ -42,22 +43,39 @@ class AuthController extends Controller
             'fullname' => 'required|string|min:2|max:100',
             'agree_terms' => 'required'
         ], [
+            'email.unique'=> 'Эта почта уже привязана!',
             'password.confirmed' => 'Пароли не совпадают',
             'agree_terms.required' => 'Необходимо согласие с условиями'
         ]);
 
-        User::create([
+        $user = User::create([
             'username'=> $request->username,
             'fullname'=> $request->fullname,
             'email'=> $request->email,
             'password'=> Hash::make($request->password)
         ]);
 
-        $credentials = $request->only('username', 'password');
-        Auth::attempt($credentials);
+        Auth::login($user);
+        $request->session()->regenerate();
+
         // пока перенаправляем на главную из-за того что отсутсвует журнал.
-        return redirect('/home')->with('success', 'Успешная регистрация! Добро пожаловать ' 
+        return redirect('/')->with('success', 'Успешная регистрация! Добро пожаловать ' 
     . $request->username . '!');
+    }
+
+    private function saveSession(Request $request) {
+        $userId = Auth::id();
+
+        $sessionId = $request->session()->getId();
+
+        \Illuminate\Support\Facades\Redis::setex("user_session:{$userId}", 3600, $sessionId);
+
+
+        \Illuminate\Support\Facades\Redis::hmset("user:{$userId}", [
+            "username" => Auth::user()->username,
+            "email"=> Auth::user()->email,
+            "last_login"=> now()->toDateTimeString()
+        ]);
     }
 
     public function processAuth(Request $request)

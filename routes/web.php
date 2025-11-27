@@ -13,3 +13,7 @@ Route::get('/auth', function() {
 
 Route::get('/auth', [AuthController::class, 'showAuth'])->name('auth.form');
 Route::post('/auth', [AuthController::class, 'processAuth'])->name('auth.process');
+
+Route::get('/journal', function() {
+    return view('journal');
+});

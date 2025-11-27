@@ -30,7 +30,7 @@
         
         <div class="form-group">
             <label>Логин:{{ (isset($is_register_mode) && $is_register_mode) ? ' *' : '' }}</label>
-            <input type="text" name="login" value="{{ old('login') }}" 
+            <input type="text" name="username" value="{{ old('username') }}" 
                    {{ (isset($is_register_mode) && $is_register_mode) ? 'required' : '' }}>
             @if(!(isset($is_register_mode) && $is_register_mode))
                 <small class="field-hint">Минимум 3 символа (только для входа)</small>
@@ -60,7 +60,7 @@
             
             <div class="form-group">
                 <label>ФИО: *</label>
-                <input type="text" name="full_name" value="{{ old('full_name') }}">
+                <input type="text" name="fullname" value="{{ old('fullname') }}">
                 <small class="field-hint">Минимум 2 символа</small>
             </div>
             
@@ -118,6 +118,26 @@
     .form-group input, .form-group select { 
         width: 95%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; 
     }
+    .checkbox-group{
+        margin: 20px 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+    }
+    .checkbox-group label{
+        display: flex !important;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-weight: normal;
+    }
+
+    .checkbox-group input[type="checkbox"]{
+        width: auto !important;
+        margin: 0;
+        transform: scale(1.2);
+    }
+
     .form-group input:invalid { border-color: #e74c3c; }
     .form-group input:valid { border-color: #27ae60; }
     .field-hint { color: #7f8c8d; font-size: 12px; margin-top: 5px; display: block; }

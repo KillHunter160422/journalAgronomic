@@ -79,7 +79,7 @@
             $itemMenu=[
                 ["url" => "/", "text" => "Home"],
                 ["url" => "/forum", "text" => "Forum"],
-                ["url" => "/", "text" => "Journal"]
+                ["url" => "/journal", "text" => "Journal"]
         ];
         foreach($itemMenu as $item){
             echo " <ul class=\"menu-list flex flex-row flex-nowrap m-0 p-0 list-none gap-12\">
