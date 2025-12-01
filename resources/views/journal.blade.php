@@ -7,48 +7,59 @@
 @section('content')
     <h3>Журнал наблюдений</h3>
     <div class="container">
-        <div class="crops">
-
-        </div>
+    <div class="card">
         <div class="crop-name">
-            <h3>Название культуры</h3>
-        </div>
-        <div class="variety">
-            <h3>Сорт</h3>
-        </div>
-        <div class="vegetation">
-            <h3>Вегетационный период</h3>
+            <div>
+                <h3>Avatar</h3>
+            </div>
+            <div>
+                <p>username</p>
+                <p>Описание поля(до 100 символов)</p>
+                <p>Название культуры</p>
+                <p>Сорт</p>
+                <p>Вегетационный период</p>
+            </div>
+            <div class="field-stats">
+                <p>Площадь поля</p>
+                <p>Кол-во операций</p>
+            </div>
+            <div>Дата публикации/обновления</div>
         </div>
     </div>
 
     <style>
-        h3 {
+        p, h3 {
+            text-align: center;
+        }
+        p{
+            margin: 10px;
             text-align: center;
         }
         .container {
-            background-color: #e0e0e0;
-            min-height: 500px;
-            min-width: 800px;
-            padding: 10px;
-            margin: 20px;
             display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+            margin: 10px;
         }
-        .crops {
-            background-color: #ff0080ff;
-            max-height: 100px;
-            max-width: 100px;
-            grid-column: 1;
-
-            margin-right: 20px;
+        .card{
+            display: flex;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
+            background-color: #e0e0e0;
         }
-        .crop-name {
-            grid-column: 2;
+        .crop-name{
+            padding: 20px;
+            align-items: center;
+            text-align: center;
         }
-        .variety {
-            grid-column: 3;
-        }
-        .vegetation {
-            grid-column: 4;
-        }
+        .field-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+}
     </style>
 @endsection

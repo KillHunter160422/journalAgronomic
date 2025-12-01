@@ -28,6 +28,12 @@ class AuthController extends Controller
         if(Auth::attempt($credentials)){
             $request->session()->regenerate();
 
+            session_start();
+            $_SESSION['user_id'] = Auth::id();
+            $_SESSION['username'] = Auth::user()->username;
+            $_SESSION['email'] = Auth::user()->email;
+            $_SESSION['token'] = csrf_token();
+
             return redirect('/')->with('success', 'Вход успешно выполнен!');
         }
 
