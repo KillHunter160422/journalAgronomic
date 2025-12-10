@@ -16,72 +16,81 @@ class AuthController extends Controller
         return view('auth', ['is_register_mode' => $is_register_mode]);
     }
 
-    private function handleLogin(Request $request)
-    {
-        $request->validate([
-            'username' => 'required|string|min:3',
-            'password' => 'required|string|min:6'
-        ]);
+private function handleLogin(Request $request)
+{
+    $request->validate([
+        'username' => 'required|string|min:3',
+        'password' => 'required|string|min:6'
+    ]);
 
-        $credentials = $request->only('username', 'password');
-
-        if(Auth::attempt($credentials)){
-            $request->session()->regenerate();
-
-            session_start();
-            $_SESSION['user_id'] = Auth::id();
-            $_SESSION['username'] = Auth::user()->username;
-            $_SESSION['email'] = Auth::user()->email;
-            $_SESSION['token'] = csrf_token();
-
-            return redirect('/')->with('success', 'Вход успешно выполнен!');
-        }
-
-        return back()->with('error', 'Неверный логин или пароль');
+    $user = User::where('username', $request->username)->first();
+    
+    if ($user && Hash::check($request->password, $user->password)) {
+        $roles = $user->getRoleNames();
+        // ТОЛЬКО PHP сессия
+        session_start();
+        $_SESSION['user_id'] = $user->user_id;
+        $_SESSION['username'] = $user->username;
+        $_SESSION['email'] = $user->email;
+        $_SESSION['fullname'] = $user->fullname;
+        $_SESSION['avatar_url'] = $user->avatar_url;
+        $_SESSION['roles'] = $roles;
+        $_SESSION['_token'] = csrf_token();
+        $_SESSION['logged_in_at'] = date('Y-m-d H:i:s');
+        session_write_close();
+        
+        return redirect('/')->with('success', 'Добро пожаловать, ' . $user->username . '!');
     }
 
-    private function handleRegister(Request $request)
-    {
-        $request->validate([
-            'username' => 'required|string|min:3|max:20|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-            'email' => 'required|email|max:255|unique:users',
-            'fullname' => 'required|string|min:2|max:100',
-            'agree_terms' => 'required'
-        ], [
-            'email.unique'=> 'Эта почта уже привязана!',
-            'password.confirmed' => 'Пароли не совпадают',
-            'agree_terms.required' => 'Необходимо согласие с условиями'
-        ]);
+    return back()->with('error', 'Неверный логин или пароль');
+}
 
-        $user = User::create([
-            'username'=> $request->username,
-            'fullname'=> $request->fullname,
-            'email'=> $request->email,
-            'password'=> Hash::make($request->password)
-        ]);
+private function handleRegister(Request $request)
+{
+    $request->validate([
+        'username' => 'required|string|min:3|max:20|unique:users',
+        'password' => 'required|string|min:6|confirmed',
+        'email' => 'required|email|max:255|unique:users',
+        'fullname' => 'required|string|min:2|max:100',
+        'agree_terms' => 'required'
+    ], [
+        'email.unique'=> 'Эта почта уже привязана!',
+        'password.confirmed' => 'Пароли не совпадают',
+        'agree_terms.required' => 'Необходимо согласие с условиями'
+    ]);
 
-        Auth::login($user);
-        $request->session()->regenerate();
+    $user = User::create([
+        'username'=> $request->username,
+        'fullname'=> $request->fullname,
+        'email'=> $request->email,
+        'password'=> Hash::make($request->password)
+    ]);
 
-        // пока перенаправляем на главную из-за того что отсутсвует журнал.
-        return redirect('/')->with('success', 'Успешная регистрация! Добро пожаловать ' 
-    . $request->username . '!');
-    }
+    $roles = $user->getRoleNames();
+    // PHP сессия
+    session_start();
+    $_SESSION['user_id'] = $user->user_id;
+    $_SESSION['username'] = $user->username;
+    $_SESSION['email'] = $user->email;
+    $_SESSION['fullname'] = $user->fullname;
+    $_SESSION['avatar_url'] = $user->avatar_url;
+    $_SESSION['roles'] = $roles;
+    $_SESSION['_token'] = csrf_token();
+    $_SESSION['logged_in_at'] = date('Y-m-d H:i:s');
+    session_write_close();
+    
+    return redirect('/home')->with('success', 'Успешная регистрация! Добро пожаловать ' . $request->username . '!');
+}
 
-    private function saveSession(Request $request) {
-        $userId = Auth::id();
+    public function logout(Request $request){
+        session_start();
+        session_destroy();
 
-        $sessionId = $request->session()->getId();
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        \Illuminate\Support\Facades\Redis::setex("user_session:{$userId}", 3600, $sessionId);
-
-
-        \Illuminate\Support\Facades\Redis::hmset("user:{$userId}", [
-            "username" => Auth::user()->username,
-            "email"=> Auth::user()->email,
-            "last_login"=> now()->toDateTimeString()
-        ]);
+        return redirect("/auth")->with("Success","Вы вышли из системы!");
     }
 
     public function processAuth(Request $request)

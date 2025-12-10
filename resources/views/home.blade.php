@@ -55,13 +55,6 @@
             text-align: center;
             font-size: 30px;
         }
-        footer {
-            text-align: auto;
-            padding: 2rem;
-            background-color: #abbaba;
-            color: black;
-            width: 99.4%;
-        }
     </style>
 
     <div class="header-info">
@@ -122,10 +115,4 @@
             </p>
         </div>
     </section>
-    <!--типо футер не определен, планируется дальнейшее представление о подвале -->
-    <footer>
-        <small>
-            Все права защищены!
-        </small>
-    </footer>
 @endsection
