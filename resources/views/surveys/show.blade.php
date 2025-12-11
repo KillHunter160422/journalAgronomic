@@ -151,6 +151,7 @@
         <div class="modal-body">
             <form id="editSurveyForm" method="POST">
                 @csrf
+                <input type="hidden" id="field_area" value="{{ $field->field_area }}">
                 <input type="hidden" name="field_id" value="{{ $field->field_id }}">
                 <input type="hidden" name="survey_id" value="{{ $survey->survey_id }}">
                 
@@ -208,27 +209,42 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="yield_mass_kg">Масса урожая (кг)</label>
+                        <label for="yield_mass_kg">Масса урожая (кг) *</label>
                         <input type="number" 
                                id="yield_mass_kg" 
                                name="yield_mass_kg" 
-                               class="form-control"
+                               class="form-control yield-input"
                                step="0.01"
                                min="0"
                                value="{{ $survey->yield_mass_kg ?? '' }}"
-                               placeholder="Например: 5000">
+                               placeholder="Например: 5000"
+                               required>
+                        <small class="calculation-hint">При изменении автоматически рассчитается урожайность с гектара</small>
                     </div>
                     
                     <div class="form-group">
-                        <label for="yield_per_hectare">Урожайность (ц/га)</label>
+                        <label for="yield_per_hectare">Урожайность (ц/га) *</label>
                         <input type="number" 
                                id="yield_per_hectare" 
                                name="yield_per_hectare" 
-                               class="form-control"
+                               class="form-control yield-input"
                                step="0.01"
                                min="0"
                                value="{{ $survey->yield_per_hectare ?? '' }}"
-                               placeholder="Например: 50.5">
+                               placeholder="Рассчитывается автоматически"
+                               readonly>
+                        <small class="calculation-info">Рассчитывается: (масса урожая / площадь поля) / 10</small>
+                    </div>
+                </div>
+                
+                <div class="form-group calculation-preview">
+                    <div class="calc-preview">
+                        <strong>Расчёт:</strong>
+                        <span id="calculationFormula">(0 / {{ $field->field_area }}) / 10 = 0 ц/га</span>
+                    </div>
+                    <div class="calc-difference">
+                        <strong>Разница с текущим значением:</strong>
+                        <span id="calculationDifference">0 ц/га</span>
                     </div>
                 </div>
                 
@@ -438,18 +454,6 @@
     width: 90%;
     max-width: 600px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-50px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .modal-header {
@@ -513,6 +517,79 @@
     border-color: #47866A;
     outline: none;
     box-shadow: 0 0 0 3px rgba(71, 134, 106, 0.1);
+}
+
+.form-control[readonly] {
+    background-color: #f8f9fa;
+    border-color: #ddd;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.calculation-hint {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #007bff;
+    font-style: italic;
+}
+
+.calculation-info {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.calculation-preview {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #47866A;
+    margin-top: 10px;
+}
+
+.calc-preview, .calc-difference {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.calc-preview strong, .calc-difference strong {
+    color: #333;
+    margin-right: 5px;
+}
+
+#calculationFormula {
+    color: #47866A;
+    font-weight: 500;
+    background-color: #e7f7ef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+#calculationDifference {
+    color: #c62828;
+    font-weight: 500;
+    background-color: #ffebee;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.calc-difference .positive {
+    color: #2e7d5f;
+    background-color: #e7f7ef;
+}
+
+.calc-difference .negative {
+    color: #c62828;
+    background-color: #ffebee;
+}
+
+.calc-difference .zero {
+    color: #666;
+    background-color: #f0f0f0;
 }
 
 textarea.form-control {
@@ -608,6 +685,7 @@ function openEditSurveyModal() {
     const modal = document.getElementById('editSurveyModal');
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
+    calculateYield();
 }
 
 function closeModal() {
@@ -624,6 +702,58 @@ window.addEventListener('click', function(event) {
     }
 });
 
+// Функция расчета урожайности с гектара
+function calculateYield() {
+    const yieldMassInput = document.getElementById('yield_mass_kg');
+    const yieldPerHectareInput = document.getElementById('yield_per_hectare');
+    const calculationFormula = document.getElementById('calculationFormula');
+    const calculationDifference = document.getElementById('calculationDifference');
+    const fieldArea = parseFloat(document.getElementById('field_area').value);
+    const currentYield = parseFloat(yieldPerHectareInput.dataset.original) || 0;
+    
+    const yieldMass = parseFloat(yieldMassInput.value) || 0;
+    const calculatedYieldPerHectare = (yieldMass / fieldArea) / 10;
+    
+    yieldPerHectareInput.value = calculatedYieldPerHectare.toFixed(2);
+    calculationFormula.textContent = `(${yieldMass.toFixed(1)} / ${fieldArea}) / 10 = ${calculatedYieldPerHectare.toFixed(2)} ц/га`;
+    
+    const difference = calculatedYieldPerHectare - currentYield;
+    const absDifference = Math.abs(difference);
+    
+    let differenceText = '';
+    let differenceClass = '';
+    
+    if (absDifference < 0.01) {
+        differenceText = '0 ц/га';
+        differenceClass = 'zero';
+    } else if (difference > 0) {
+        differenceText = `+${difference.toFixed(2)} ц/га`;
+        differenceClass = 'positive';
+    } else {
+        differenceText = `${difference.toFixed(2)} ц/га`;
+        differenceClass = 'negative';
+    }
+    
+    calculationDifference.textContent = differenceText;
+    calculationDifference.className = differenceClass;
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const yieldMassInput = document.getElementById('yield_mass_kg');
+    const yieldPerHectareInput = document.getElementById('yield_per_hectare');
+    
+    if (yieldPerHectareInput) {
+        yieldPerHectareInput.dataset.original = yieldPerHectareInput.value || 0;
+    }
+    
+    if (yieldMassInput) {
+        yieldMassInput.addEventListener('input', calculateYield);
+        yieldMassInput.addEventListener('change', calculateYield);
+        calculateYield();
+    }
+});
+
 // Обработка отправки формы редактирования
 document.getElementById('editSurveyForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -632,29 +762,42 @@ document.getElementById('editSurveyForm').addEventListener('submit', function(e)
     const fieldId = formData.get('field_id');
     const surveyId = formData.get('survey_id');
     
-    fetch(`/fields/${fieldId}/surveys/${surveyId}/update`, {
+    const submitBtn = this.querySelector('.btn-primary');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Сохранение...';
+    submitBtn.disabled = true;
+    
+    const url = `/fields/${fieldId}/surveys/${surveyId}/update`;
+    
+    fetch(url, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
         },
         body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Обследование успешно обновлено');
-            location.reload(); // Перезагружаем страницу для отображения изменений
+            alert('Обследование успешно обновлено!');
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } else {
             alert('Ошибка: ' + (data.error || 'Не удалось обновить обследование'));
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
         }
     })
     .catch(error => {
-        console.error('Error:', error);
         alert('Ошибка сети при обновлении обследования');
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     });
 });
 
-// Удаление обследования (остается как было)
+// Удаление обследования
 document.addEventListener('DOMContentLoaded', function() {
     const deleteBtn = document.querySelector('.btn-delete');
     if (deleteBtn) {
@@ -680,7 +823,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
                     alert('Ошибка сети');
                 });
             }

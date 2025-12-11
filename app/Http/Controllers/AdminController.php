@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
@@ -72,48 +74,48 @@ class AdminController extends Controller
     }
     
     // Список всех полей
-public function fields(Request $request)
-{
-    if (!php_auth_check() || !php_auth_is_admin()) {
-        abort(403, 'Доступ запрещен. Требуются права администратора.');
+    public function fields(Request $request)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен. Требуются права администратора.');
+        }
+        
+        $query = DB::table('fields as f')
+            ->join('users as u', 'f.user_id', '=', 'u.user_id')
+            ->select('f.*', 'u.username', 'u.email', 'u.avatar_url')
+            ->orderBy('f.created_at', 'desc');
+        
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where('f.field_name', 'like', "%{$search}%");
+        }
+        
+        if ($request->has('visibility') && $request->visibility) {
+            $query->where('f.is_public', $request->visibility == 'public' ? 1 : 0);
+        }
+        
+        if ($request->has('owner') && $request->owner) {
+            $query->where('f.user_id', $request->owner);
+        }
+        
+        $fields = $query->paginate(20);
+        
+        // Получаем всех пользователей для фильтра
+        $users = DB::table('users')
+            ->select('user_id', 'username')
+            ->orderBy('username')
+            ->get();
+        
+        // Получаем статистику для полей
+        $stats = [
+            'total_fields' => DB::table('fields')->count(),
+            'public_fields' => DB::table('fields')->where('is_public', 1)->count(),
+            'private_fields' => DB::table('fields')->where('is_public', 0)->count(),
+            'total_area' => DB::table('fields')->sum('field_area') ?? 0,
+        ];
+        
+        return view('admin.fields', compact('fields', 'users', 'stats'));
     }
-    
-    $query = DB::table('fields as f')
-        ->join('users as u', 'f.user_id', '=', 'u.user_id')
-        ->select('f.*', 'u.username', 'u.email', 'u.avatar_url')
-        ->orderBy('f.created_at', 'desc');
-    
-    if ($request->has('search') && $request->search) {
-        $search = $request->search;
-        $query->where('f.field_name', 'like', "%{$search}%");
-    }
-    
-    if ($request->has('visibility') && $request->visibility) {
-        $query->where('f.is_public', $request->visibility == 'public' ? 1 : 0);
-    }
-    
-    if ($request->has('owner') && $request->owner) {
-        $query->where('f.user_id', $request->owner);
-    }
-    
-    $fields = $query->paginate(20);
-    
-    // Получаем всех пользователей для фильтра
-    $users = DB::table('users')
-        ->select('user_id', 'username')
-        ->orderBy('username')
-        ->get();
-    
-    // Получаем статистику для полей
-    $stats = [
-        'total_fields' => DB::table('fields')->count(),
-        'public_fields' => DB::table('fields')->where('is_public', 1)->count(),
-        'private_fields' => DB::table('fields')->where('is_public', 0)->count(),
-        'total_area' => DB::table('fields')->sum('field_area') ?? 0,
-    ];
-    
-    return view('admin.fields', compact('fields', 'users', 'stats'));
-}
     
     // Получить список всех ролей
     public function roles()
@@ -408,194 +410,452 @@ public function fields(Request $request)
         
         php_session_set('roles', $roles);
     }
-    // Экспорт пользователей
-public function exportUsers(Request $request)
-{
-    if (!php_auth_check() || !php_auth_is_admin()) {
-        abort(403, 'Доступ запрещен.');
-    }
     
-    $query = DB::table('users as u')
-        ->leftJoin('fields as f', 'u.user_id', '=', 'f.user_id')
-        ->select(
-            'u.user_id as id',
-            'u.username',
-            'u.email',
-            'u.fullname',
-            'u.created_at',
-            DB::raw('COUNT(f.field_id) as fields_count'),
-            DB::raw('(SELECT GROUP_CONCAT(ur.role_name) 
-                      FROM user_role_assignments ura 
-                      JOIN user_roles ur ON ura.role_id = ur.role_id 
-                      WHERE ura.user_id = u.user_id) as roles')
-        )
-        ->groupBy('u.user_id');
+    // --- МЕТОДЫ ЭКСПОРТА И ИМПОРТА ---
     
-    // Применяем фильтры
-    if ($request->has('filters')) {
-        $filters = $request->input('filters', []);
-        
-        if (in_array('with_fields', $filters)) {
-            $query->having('fields_count', '>', 0);
+    /**
+     * Экспорт пользователей
+     */
+    public function exportUsers(Request $request)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
         }
         
-        if (in_array('with_roles', $filters)) {
-            $query->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('user_role_assignments')
-                    ->whereRaw('user_role_assignments.user_id = u.user_id');
+        $query = DB::table('users as u')
+            ->select(
+                'u.user_id',
+                'u.username',
+                'u.email',
+                'u.fullname',
+                'u.created_at',
+                DB::raw('(SELECT COUNT(*) FROM fields WHERE user_id = u.user_id) as fields_count')
+            );
+        
+        // Применяем текущие фильтры из запроса
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('u.username', 'like', "%{$search}%")
+                  ->orWhere('u.email', 'like', "%{$search}%")
+                  ->orWhere('u.fullname', 'like', "%{$search}%");
             });
         }
         
-        if (in_array('active_only', $filters)) {
-            $query->where('u.is_active', 1);
+        if ($request->has('role') && $request->role) {
+            $query->whereExists(function ($q) use ($request) {
+                $q->select(DB::raw(1))
+                  ->from('user_role_assignments')
+                  ->whereRaw('user_role_assignments.user_id = u.user_id')
+                  ->where('user_role_assignments.role_id', $request->role);
+            });
+        }
+        
+        if ($request->has('status') && $request->status) {
+            if ($request->status === 'active') {
+                $query->where('u.is_active', 1);
+            } elseif ($request->status === 'inactive') {
+                $query->where('u.is_active', 0);
+            }
+        }
+        
+        // Дополнительные фильтры из панели экспорта
+        if ($request->has('filters')) {
+            $filters = (array) $request->input('filters');
+            
+            if (in_array('with_fields', $filters)) {
+                $query->whereExists(function ($q) {
+                    $q->select(DB::raw(1))
+                      ->from('fields')
+                      ->whereRaw('fields.user_id = u.user_id');
+                });
+            }
+            
+            if (in_array('with_roles', $filters)) {
+                $query->whereExists(function ($q) {
+                    $q->select(DB::raw(1))
+                      ->from('user_role_assignments')
+                      ->whereRaw('user_role_assignments.user_id = u.user_id');
+                });
+            }
+            
+            if (in_array('active_only', $filters)) {
+                $query->where('u.is_active', 1);
+            }
+        }
+        
+        $users = $query->get();
+        
+        // Получаем роли для каждого пользователя
+        foreach ($users as $user) {
+            $roles = DB::table('user_role_assignments as ura')
+                ->join('user_roles as ur', 'ura.role_id', '=', 'ur.role_id')
+                ->where('ura.user_id', $user->user_id)
+                ->pluck('ur.role_name')
+                ->toArray();
+            
+            $user->roles = implode(', ', $roles);
+        }
+        
+        // Выбранные колонки
+        $columns = $request->input('columns', ['id', 'username', 'email', 'created_at']);
+        $format = $request->input('format', 'csv');
+        
+        // Подготовка данных для экспорта
+        $exportData = [];
+        foreach ($users as $user) {
+            $row = [];
+            
+            if (in_array('id', $columns)) {
+                $row['ID'] = $user->user_id;
+            }
+            
+            if (in_array('username', $columns)) {
+                $row['Имя пользователя'] = $user->username;
+            }
+            
+            if (in_array('email', $columns)) {
+                $row['Email'] = $user->email;
+            }
+            
+            if (in_array('fullname', $columns)) {
+                $row['Полное имя'] = $user->fullname ?? '-';
+            }
+            
+            if (in_array('roles', $columns)) {
+                $row['Роли'] = $user->roles ?? '-';
+            }
+            
+            if (in_array('created_at', $columns)) {
+                $row['Дата регистрации'] = date('d.m.Y H:i', strtotime($user->created_at));
+            }
+            
+            if (in_array('fields_count', $columns)) {
+                $row['Количество полей'] = $user->fields_count;
+            }
+            
+            $exportData[] = $row;
+        }
+        
+        $filename = 'users_export_' . date('Y-m-d_H-i-s') . '.' . $format;
+        
+        if ($format === 'excel') {
+            return $this->exportToExcel($exportData, $filename);
+        } elseif ($format === 'pdf') {
+            return $this->exportToPDF($exportData, $filename);
+        } else {
+            return $this->exportToCSV($exportData, $filename);
         }
     }
     
-    // Фильтр по дате
-    if ($request->has('start_date')) {
-        $query->whereDate('u.created_at', '>=', $request->start_date);
+    /**
+     * Импорт пользователей
+     */
+    public function importUsers(Request $request)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
+        }
+        
+        $validator = Validator::make($request->all(), [
+            'import_file' => 'required|file|mimes:csv,txt,xlsx,xls',
+            'skip_duplicates' => 'nullable|boolean',
+            'send_welcome_email' => 'nullable|boolean',
+            'assign_default_role' => 'nullable|boolean',
+        ]);
+        
+        if ($validator->fails()) {
+            return redirect()->route('admin.users')
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
+        $file = $request->file('import_file');
+        $skipDuplicates = $request->boolean('skip_duplicates', true);
+        $assignDefaultRole = $request->boolean('assign_default_role', true);
+        
+        try {
+            if ($file->getClientOriginalExtension() === 'csv') {
+                $results = $this->importFromCSV($file, $skipDuplicates, $assignDefaultRole);
+            } else {
+                $results = $this->importFromExcel($file, $skipDuplicates, $assignDefaultRole);
+            }
+            
+            $successMessage = "Импорт завершен. Успешно импортировано: {$results['imported']} пользователей";
+            
+            if ($results['skipped'] > 0) {
+                $successMessage .= ", пропущено: {$results['skipped']} пользователей";
+            }
+            
+            if (!empty($results['errors'])) {
+                $request->session()->flash('import_errors', $results['errors']);
+            }
+            
+            return redirect()->route('admin.users')
+                ->with('import_success', $successMessage);
+                
+        } catch (\Exception $e) {
+            return redirect()->route('admin.users')
+                ->with('error', 'Ошибка импорта: ' . $e->getMessage());
+        }
     }
     
-    if ($request->has('end_date')) {
-        $query->whereDate('u.created_at', '<=', $request->end_date);
+    /**
+     * Скачать шаблон для импорта
+     */
+    public function downloadImportTemplate()
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
+        }
+        
+        $filename = 'users_import_template.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        
+        $callback = function() {
+            $file = fopen('php://output', 'w');
+            
+            // UTF-8 BOM
+            fwrite($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            
+            // Заголовки
+            fputcsv($file, ['email', 'username', 'fullname']);
+            
+            // Примеры данных
+            fputcsv($file, ['ivan@example.com', 'ivan', 'Иван Иванов']);
+            fputcsv($file, ['petr@example.com', 'petr', 'Петр Петров']);
+            fputcsv($file, ['anna@example.com', 'anna', 'Анна Смирнова']);
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, $headers);
     }
     
-    $users = $query->get();
+    // --- ПРИВАТНЫЕ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
     
-    // Форматируем данные для экспорта
-    $exportData = [];
-    $selectedColumns = $request->input('columns', ['id', 'username', 'email', 'created_at']);
-    
-    foreach ($users as $user) {
-        $row = [];
+    /**
+     * Импорт из CSV
+     */
+    private function importFromCSV($file, $skipDuplicates, $assignDefaultRole)
+    {
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        $line = 1;
         
-        if (in_array('id', $selectedColumns)) {
-            $row['ID'] = $user->id;
+        $handle = fopen($file->getPathname(), 'r');
+        $headers = fgetcsv($handle, 1000, ',');
+        
+        while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+            $line++;
+            
+            if (count($data) < 2) {
+                $errors[] = "Строка {$line}: Недостаточно данных";
+                continue;
+            }
+            
+            $email = trim($data[0] ?? '');
+            $username = trim($data[1] ?? '');
+            $fullname = trim($data[2] ?? '');
+            
+            if (empty($email) || empty($username)) {
+                $errors[] = "Строка {$line}: Отсутствует email или имя пользователя";
+                continue;
+            }
+            
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Строка {$line}: Некорректный email адрес: {$email}";
+                continue;
+            }
+            
+            if ($skipDuplicates) {
+                $exists = DB::table('users')->where('email', $email)->exists();
+                if ($exists) {
+                    $skipped++;
+                    continue;
+                }
+            }
+            
+            try {
+                DB::beginTransaction();
+                
+                // Создаем пользователя
+                $userId = DB::table('users')->insertGetId([
+                    'username' => $username,
+                    'email' => $email,
+                    'fullname' => $fullname ?: null,
+                    'password' => Hash::make(uniqid()),
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                
+                // Назначаем роль по умолчанию
+                if ($assignDefaultRole) {
+                    $userRole = DB::table('user_roles')->where('role_name', 'user')->first();
+                    if ($userRole) {
+                        DB::table('user_role_assignments')->insert([
+                            'user_id' => $userId,
+                            'role_id' => $userRole->role_id,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+                
+                DB::commit();
+                $imported++;
+                
+            } catch (\Exception $e) {
+                DB::rollBack();
+                $errors[] = "Строка {$line}: Ошибка базы данных - " . $e->getMessage();
+            }
         }
         
-        if (in_array('username', $selectedColumns)) {
-            $row['Имя пользователя'] = $user->username;
-        }
+        fclose($handle);
         
-        if (in_array('email', $selectedColumns)) {
-            $row['Email'] = $user->email;
-        }
-        
-        if (in_array('fullname', $selectedColumns)) {
-            $row['Полное имя'] = $user->fullname ?? '-';
-        }
-        
-        if (in_array('roles', $selectedColumns)) {
-            $row['Роли'] = $user->roles ?? '-';
-        }
-        
-        if (in_array('created_at', $selectedColumns)) {
-            $row['Дата регистрации'] = date('d.m.Y H:i', strtotime($user->created_at));
-        }
-        
-        if (in_array('fields_count', $selectedColumns)) {
-            $row['Количество полей'] = $user->fields_count;
-        }
-        
-        $exportData[] = $row;
+        return [
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'errors' => $errors
+        ];
     }
     
-    $format = $request->input('format', 'csv');
-    $filename = 'users_export_' . date('Y-m-d_H-i-s') . '.' . $format;
-    
-    if ($format === 'csv') {
-        return $this->exportToCSV($exportData, $filename);
-    } elseif ($format === 'excel') {
-        return $this->exportToExcel($exportData, $filename);
-    } elseif ($format === 'pdf') {
-        return $this->exportToPDF($exportData, $filename);
+    /**
+     * Импорт из Excel (простая реализация)
+     */
+    private function importFromExcel($file, $skipDuplicates, $assignDefaultRole)
+    {
+        // Для работы с Excel установите пакет PhpSpreadsheet или Maatwebsite/Excel
+        // В данном примере используем простую CSV-совместимую реализацию
+        
+        $tmpPath = $file->getPathname();
+        $extension = $file->getClientOriginalExtension();
+        
+        if ($extension === 'xlsx' || $extension === 'xls') {
+            // Конвертируем в CSV для простоты
+            // Для полной реализации рекомендуется использовать PhpSpreadsheet
+            throw new \Exception('Импорт из Excel файлов требует установки дополнительных библиотек');
+        }
+        
+        return $this->importFromCSV($file, $skipDuplicates, $assignDefaultRole);
     }
     
-    return redirect()->back()->with('error', 'Неверный формат экспорта');
-}
-
-private function exportToCSV($data, $filename)
-{
-    $headers = [
-        'Content-Type' => 'text/csv; charset=utf-8',
-        'Content-Disposition' => "attachment; filename=\"$filename\"",
-    ];
+    /**
+     * Экспорт в CSV
+     */
+    private function exportToCSV($data, $filename)
+    {
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        
+        $callback = function() use ($data) {
+            $file = fopen('php://output', 'w');
+            // UTF-8 BOM для корректного отображения кириллицы
+            fwrite($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            
+            if (!empty($data)) {
+                // Заголовки
+                fputcsv($file, array_keys($data[0]), ';');
+                
+                // Данные
+                foreach ($data as $row) {
+                    fputcsv($file, $row, ';');
+                }
+            }
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, $headers);
+    }
     
-    $callback = function() use ($data) {
-        $file = fopen('php://output', 'w');
-        fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM для UTF-8
+    /**
+     * Экспорт в Excel (табулированный текст)
+     */
+    private function exportToExcel($data, $filename)
+    {
+        $headers = [
+            'Content-Type' => 'application/vnd.ms-excel',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        
+        $output = '';
         
         if (!empty($data)) {
             // Заголовки
-            fputcsv($file, array_keys($data[0]), ';');
+            $output .= implode("\t", array_keys($data[0])) . "\n";
             
             // Данные
             foreach ($data as $row) {
-                fputcsv($file, $row, ';');
+                $output .= implode("\t", array_map(function($value) {
+                    return str_replace(["\t", "\r", "\n"], ' ', $value);
+                }, $row)) . "\n";
             }
         }
         
-        fclose($file);
-    };
-    
-    return response()->stream($callback, 200, $headers);
-}
-
-private function exportToExcel($data, $filename)
-{
-    $headers = [
-        'Content-Type' => 'application/vnd.ms-excel',
-        'Content-Disposition' => "attachment; filename=\"$filename\"",
-    ];
-    
-    $output = '';
-    
-    if (!empty($data)) {
-        // Заголовки
-        $output .= implode("\t", array_keys($data[0])) . "\n";
-        
-        // Данные
-        foreach ($data as $row) {
-            $output .= implode("\t", array_map(function($value) {
-                return str_replace(["\t", "\r", "\n"], ' ', $value);
-            }, $row)) . "\n";
-        }
+        return response($output, 200, $headers);
     }
     
-    return response($output, 200, $headers);
-}
-
-private function exportToPDF($data, $filename)
-{
-    $html = '<h1>Экспорт пользователей</h1>';
-    $html .= '<table border="1" cellpadding="5">';
-    
-    if (!empty($data)) {
-        // Заголовки
-        $html .= '<tr>';
-        foreach (array_keys($data[0]) as $header) {
-            $html .= '<th>' . htmlspecialchars($header) . '</th>';
-        }
-        $html .= '</tr>';
+    /**
+     * Экспорт в PDF (HTML с указанием типа PDF)
+     */
+    private function exportToPDF($data, $filename)
+    {
+        $html = '<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Экспорт пользователей</title>
+            <style>
+                body { font-family: DejaVu Sans, sans-serif; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #47866A; color: white; padding: 10px; text-align: left; }
+                td { padding: 8px; border-bottom: 1px solid #ddd; }
+                h1 { color: #47866A; }
+            </style>
+        </head>
+        <body>
+            <h1>Экспорт пользователей</h1>
+            <p>Дата экспорта: ' . date('d.m.Y H:i') . '</p>';
         
-        // Данные
-        foreach ($data as $row) {
+        if (!empty($data)) {
+            $html .= '<table>';
+            
+            // Заголовки
             $html .= '<tr>';
-            foreach ($row as $cell) {
-                $html .= '<td>' . htmlspecialchars($cell) . '</td>';
+            foreach (array_keys($data[0]) as $header) {
+                $html .= '<th>' . htmlspecialchars($header) . '</th>';
             }
             $html .= '</tr>';
+            
+            // Данные
+            foreach ($data as $row) {
+                $html .= '<tr>';
+                foreach ($row as $cell) {
+                    $html .= '<td>' . htmlspecialchars($cell) . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            
+            $html .= '</table>';
         }
+        
+        $html .= '</body></html>';
+        
+        $headers = [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+        
+        // Для реального PDF потребуется библиотека типа Dompdf
+        // В этом примере возвращаем HTML с указанием типа PDF
+        return response($html, 200, $headers);
     }
-    
-    $html .= '</table>';
-    
-    $headers = [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => "attachment; filename=\"$filename\"",
-    ];
-    
-    return response($html, 200, $headers);
-}
 }

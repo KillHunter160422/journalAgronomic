@@ -22,7 +22,6 @@
                     <option value="newest">Сначала новые</option>
                     <option value="oldest">Сначала старые</option>
                     <option value="operations">По количеству операций</option>
-                    <option value="surveys">По количеству обследований</option>
                 </select>
             </div>
         </div>
@@ -35,8 +34,7 @@
         $currentUserId = php_auth_check() ? php_session('user_id') : null;
         
         try {
-            // Получаем ВСЕ поля пользователя (и публичные, и приватные)
-            $fields = \App\Models\Field::with(['user', 'surveys'])
+            $fields = \App\Models\Field::with('user')
                 ->where('user_id', $currentUserId)
                 ->orderBy('updated_at', 'desc')
                 ->limit(12)
@@ -64,19 +62,9 @@
                     $statusText = getStatusText($status);
                     
                     $cropColor = getCropColor($cropName ?? 'default');
-                    
-                    // Получаем количество обследований
-                    $surveysCount = $field->surveys_count ?? $field->surveys->count() ?? 0;
-                    
-                    // Получаем дату последнего обследования
-                    $lastSurveyDate = null;
-                    if ($field->surveys && $field->surveys->isNotEmpty()) {
-                        $lastSurvey = $field->surveys->sortByDesc('survey_date')->first();
-                        $lastSurveyDate = date('d.m.Y', strtotime($lastSurvey->survey_date));
-                    }
         ?>
         
-        <div class="field-card">
+        <div class="field-card" data-field-id="<?php echo $field->field_id; ?>">
             <div class="field-header" style="background: <?php echo $cropColor; ?>;" onclick="location.href='/fields/<?php echo $field->field_id; ?>'">
                 <div class="field-avatar">
                     <i class="fas fa-user-circle"></i>
@@ -86,7 +74,7 @@
                     <p class="field-name"><?php echo htmlspecialchars($field->field_name ?? 'Без названия'); ?></p>
                 </div>
                 <div class="field-actions">
-                    <button class="btn-edit-field" onclick="openEditModal(event, <?php echo $field->field_id; ?>)">
+                    <button class="btn-edit-field" onclick="openEditModal(<?php echo $field->field_id; ?>)">
                         <i class="fas fa-edit"></i>
                     </button>
                 </div>
@@ -101,14 +89,6 @@
                     <span class="private-badge" title="Приватное поле">
                         🔒 Приватное
                     </span>
-                <?php endif; ?>
-                
-                <!-- Бейдж обследований -->
-                <?php if ($surveysCount > 0): ?>
-                <div class="survey-badge" title="Количество обследований">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span><?php echo $surveysCount; ?></span>
-                </div>
                 <?php endif; ?>
             </div>
             
@@ -154,42 +134,11 @@
                     <div class="stat-item">
                         <span class="stat-icon">📊</span>
                         <div>
-                            <span class="stat-value"><?php echo $surveysCount; ?></span>
+                            <span class="stat-value"><?php echo $field->surveys_count ?? 0; ?></span>
                             <span class="stat-label">Обследований</span>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Последнее обследование -->
-                <?php if ($lastSurveyDate): ?>
-                <div class="last-survey-info">
-                    <div class="survey-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="survey-details">
-                        <div class="survey-title">Последнее обследование</div>
-                        <div class="survey-date"><?php echo $lastSurveyDate; ?></div>
-                    </div>
-                    <button class="btn-add-survey" 
-                            onclick="event.stopPropagation(); location.href='/fields/<?php echo $field->field_id; ?>/surveys/add'">
-                        <i class="fas fa-plus"></i> Добавить
-                    </button>
-                </div>
-                <?php else: ?>
-                <div class="no-surveys">
-                    <div class="no-survey-icon">
-                        <i class="fas fa-clipboard"></i>
-                    </div>
-                    <div class="no-survey-text">
-                        <div class="no-survey-title">Нет обследований</div>
-                        <div class="no-survey-subtitle">Начните вести мониторинг поля</div>
-                    </div>
-                    <button class="btn-add-survey-primary" 
-                            onclick="event.stopPropagation(); location.href='/fields/<?php echo $field->field_id; ?>/surveys/add'">
-                        <i class="fas fa-plus"></i> Создать
-                    </button>
-                </div>
-                <?php endif; ?>
             </div>
             
             <div class="field-footer" onclick="location.href='/fields/<?php echo $field->field_id; ?>'">
@@ -226,184 +175,80 @@
     <?php endif; ?>
 </div>
 
-<!-- Модальное окно редактирования -->
-<div class="modal" id="editFieldModal">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">
-                    <i class="fas fa-edit me-2"></i>
-                    Редактировать поле
-                </h4>
-                <button type="button" class="btn-close" onclick="closeEditModal()">
-                    &times;
-                </button>
-            </div>
-            
-            <form id="editFieldForm" method="POST" class="edit-field-form">
+<!-- Модальное окно редактирования поля -->
+<div id="editFieldModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Редактировать поле</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="editFieldForm" method="POST">
                 @csrf
-                <div class="modal-body">
-                    <input type="hidden" name="field_id" id="editFieldId">
-                    
-                    <div class="form-section">
-                        <h5 class="section-title">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Основная информация
-                        </h5>
-                        
-                        <div class="form-group">
-                            <label for="editFieldName" class="form-label">
-                                <i class="fas fa-tag me-1"></i>
-                                Название поля *
-                            </label>
-                            <input type="text" 
-                                   id="editFieldName" 
-                                   name="field_name" 
-                                   class="form-input" 
-                                   placeholder="Введите название поля"
-                                   required>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="editFieldArea" class="form-label">
-                                    <i class="fas fa-ruler-combined me-1"></i>
-                                    Площадь (га) *
-                                </label>
-                                <input type="number" 
-                                       id="editFieldArea" 
-                                       name="field_area" 
-                                       class="form-input" 
-                                       step="0.01" 
-                                       min="0.01" 
-                                       placeholder="0.00"
-                                       required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="editStatus" class="form-label">
-                                    <i class="fas fa-chart-line me-1"></i>
-                                    Статус
-                                </label>
-                                <select id="editStatus" name="status" class="form-select">
-                                    <option value="active">Активное</option>
-                                    <option value="planned">Запланировано</option>
-                                    <option value="completed">Завершено</option>
-                                    <option value="problem">Проблемное</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h5 class="section-title">
-                            <i class="fas fa-seedling me-2"></i>
-                            Информация о культуре
-                        </h5>
-                        
-                        <div class="form-group">
-                            <label for="editCropName" class="form-label">
-                                <i class="fas fa-leaf me-1"></i>
-                                Культура
-                            </label>
-                            <select id="editCropName" name="crop_name" class="form-select">
-                                <option value="">Выберите культуру</option>
-                                <option value="Пшеница">Пшеница</option>
-                                <option value="Ячмень">Ячмень</option>
-                                <option value="Кукуруза">Кукуруза</option>
-                                <option value="Подсолнечник">Подсолнечник</option>
-                                <option value="Рапс">Рапс</option>
-                                <option value="Соя">Соя</option>
-                                <option value="Картофель">Картофель</option>
-                                <option value="Овес">Овес</option>
-                                <option value="Рожь">Рожь</option>
-                                <option value="Гречиха">Гречиха</option>
-                                <option value="Горох">Горох</option>
-                                <option value="Фасоль">Фасоль</option>
-                                <option value="Лен">Лен</option>
-                                <option value="Свекла">Свекла</option>
-                                <option value="Морковь">Морковь</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="editVariety" class="form-label">
-                                    <i class="fas fa-dna me-1"></i>
-                                    Сорт
-                                </label>
-                                <input type="text" 
-                                       id="editVariety" 
-                                       name="variety" 
-                                       class="form-input" 
-                                       placeholder="Название сорта">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="editVegetationPeriod" class="form-label">
-                                    <i class="fas fa-calendar-alt me-1"></i>
-                                    Период вегетации
-                                </label>
-                                <select id="editVegetationPeriod" name="vegetation_period" class="form-select">
-                                    <option value="">Выберите период</option>
-                                    <option value="Яровой">Яровой</option>
-                                    <option value="Озимый">Озимый</option>
-                                    <option value="Многолетний">Многолетний</option>
-                                    <option value="Однолетний">Однолетний</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-section">
-                        <h5 class="section-title">
-                            <i class="fas fa-cog me-2"></i>
-                            Дополнительные настройки
-                        </h5>
-                        
-                        <div class="form-group">
-                            <div class="checkbox-group">
-                                <input type="checkbox" 
-                                       id="editIsPublic" 
-                                       name="is_public"
-                                       class="checkbox-input">
-                                <label for="editIsPublic" class="checkbox-label">
-                                    <i class="fas fa-globe me-2"></i>
-                                    <div class="checkbox-text">
-                                        <strong>Публичное поле</strong>
-                                        <small>Видно другим пользователям для обмена опытом</small>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="editDescription" class="form-label">
-                                <i class="fas fa-align-left me-1"></i>
-                                Описание поля
-                            </label>
-                            <textarea id="editDescription" 
-                                      name="description" 
-                                      class="form-textarea" 
-                                      rows="3"
-                                      placeholder="Дополнительная информация о поле..."></textarea>
-                        </div>
-                    </div>
+                <input type="hidden" name="field_id" id="editFieldId">
+                
+                <div class="form-group">
+                    <label for="editFieldName">Название поля *</label>
+                    <input type="text" id="editFieldName" name="field_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editFieldArea">Площадь (га) *</label>
+                    <input type="number" id="editFieldArea" name="field_area" step="0.01" min="0.01" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editCropName">Культура</label>
+                    <select id="editCropName" name="crop_name">
+                        <option value="">Выберите культуру</option>
+                        <option value="Пшеница">Пшеница</option>
+                        <option value="Ячмень">Ячмень</option>
+                        <option value="Кукуруза">Кукуруза</option>
+                        <option value="Подсолнечник">Подсолнечник</option>
+                        <option value="Рапс">Рапс</option>
+                        <option value="Соя">Соя</option>
+                        <option value="Картофель">Картофель</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVariety">Сорт</label>
+                    <input type="text" id="editVariety" name="variety">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editVegetationPeriod">Вегетационный период</label>
+                    <select id="editVegetationPeriod" name="vegetation_period">
+                        <option value="">Выберите период</option>
+                        <option value="Яровой">Яровой</option>
+                        <option value="Озимый">Озимый</option>
+                        <option value="Многолетний">Многолетний</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editStatus">Статус</label>
+                    <select id="editStatus" name="status">
+                        <option value="active">Активное</option>
+                        <option value="planned">Запланировано</option>
+                        <option value="completed">Завершено</option>
+                        <option value="problem">Проблемное</option>
+                    </select>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="editIsPublic" name="is_public">
+                    <label for="editIsPublic">Публичное поле (видно другим пользователям)</label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editDescription">Описание поля</label>
+                    <textarea id="editDescription" name="description" rows="3"></textarea>
                 </div>
                 
                 <div class="modal-footer">
-                    <button type="button" 
-                            class="btn btn-cancel" 
-                            onclick="closeEditModal()">
-                        <i class="fas fa-times me-1"></i>
-                        Отмена
-                    </button>
-                    <button type="submit" 
-                            class="btn btn-primary"
-                            id="submitEditBtn">
-                        <i class="fas fa-save me-1"></i>
-                        Сохранить изменения
-                    </button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить изменения</button>
                 </div>
             </form>
         </div>
@@ -411,22 +256,24 @@
 </div>
 
 <style>
-    /* Основные стили журнала */
+    /* Основные стили */
     .journal-container {
         max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
+        min-height: calc(100vh - 120px);
     }
     
     .journal-header {
         margin-bottom: 30px;
+        text-align: center;
     }
     
     .journal-header h1 {
-        text-align: center;
         color: #47866A;
         font-size: 28px;
         margin-bottom: 20px;
+        font-weight: 600;
     }
     
     .journal-controls {
@@ -442,105 +289,119 @@
         background: linear-gradient(90deg, #47866A, #5CA08A);
         color: white;
         border: none;
-        padding: 12px 24px;
-        border-radius: 10px;
+        padding: 10px 20px;
+        border-radius: 8px;
         cursor: pointer;
-        font-weight: 600;
-        font-size: 15px;
+        font-weight: bold;
         display: flex;
         align-items: center;
         gap: 8px;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(71, 134, 106, 0.2);
+        font-size: 14px;
     }
     
     .btn-add-field:hover {
         background: linear-gradient(90deg, #3a7557, #4A8C74);
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(71, 134, 106, 0.3);
     }
     
     .btn-add-field span {
-        font-size: 22px;
-        font-weight: bold;
+        font-size: 18px;
     }
     
     .filter-controls {
         display: flex;
-        gap: 12px;
-        align-items: center;
+        gap: 10px;
     }
     
     .filter-select {
-        padding: 10px 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 8px;
+        padding: 8px 15px;
+        border: 2px solid #ddd;
+        border-radius: 6px;
         background: white;
         color: #333;
         cursor: pointer;
         font-size: 14px;
-        font-weight: 500;
-        min-width: 180px;
         transition: border-color 0.3s;
     }
     
     .filter-select:focus {
-        outline: none;
         border-color: #47866A;
-        box-shadow: 0 0 0 3px rgba(71, 134, 106, 0.1);
+        outline: none;
     }
     
-    /* Карточки полей */
+    /* Сетка полей */
     .fields-container {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: 25px;
         margin-bottom: 40px;
     }
     
+    @media (max-width: 1366px) {
+        .fields-container {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .journal-container {
+            padding: 15px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .fields-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .journal-controls {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .filter-controls {
+            flex-direction: column;
+        }
+    }
+    
+    /* Карточка поля */
     .field-card {
         background: white;
-        border-radius: 16px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
         overflow: hidden;
         display: flex;
         flex-direction: column;
         position: relative;
-        border: 1px solid #f0f0f0;
+        height: 100%;
     }
     
     .field-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     }
     
     .field-header {
-        padding: 24px;
+        padding: 15px;
         display: flex;
         align-items: center;
-        gap: 15px;
+        gap: 12px;
         color: white;
         position: relative;
-        min-height: 120px;
+        min-height: 90px;
     }
     
     .field-avatar {
-        width: 70px;
-        height: 70px;
+        width: 50px;
+        height: 50px;
         flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 50%;
-        border: 2px solid rgba(255, 255, 255, 0.3);
     }
     
     .field-avatar i {
-        font-size: 36px;
-        color: rgba(255, 255, 255, 0.95);
+        font-size: 35px;
+        color: rgba(255,255,255,0.9);
     }
     
     .field-user-info {
@@ -549,129 +410,94 @@
     }
     
     .field-user-info h3 {
-        margin: 0 0 8px 0;
+        margin: 0 0 5px 0;
         font-size: 16px;
-        font-weight: 600;
-        opacity: 0.9;
         text-align: left;
+        opacity: 0.9;
     }
     
     .field-name {
         margin: 0;
-        font-size: 22px;
-        font-weight: 700;
-        opacity: 0.95;
+        font-size: 18px;
+        font-weight: bold;
         text-align: left;
         line-height: 1.3;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
     }
     
-    /* Кнопка редактирования */
     .field-actions {
         position: absolute;
-        top: 20px;
-        right: 20px;
+        top: 15px;
+        right: 15px;
+        z-index: 10;
     }
     
     .btn-edit-field {
-        background: rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.3);
         border: 2px solid white;
         color: white;
-        width: 42px;
-        height: 42px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         transition: all 0.3s;
-        font-size: 18px;
+        font-size: 14px;
     }
     
     .btn-edit-field:hover {
-        background: rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.5);
         transform: scale(1.1);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
     
-    /* Privacy badge с обследованиями */
     .privacy-badge {
-        padding: 14px 20px;
+        padding: 8px 15px;
         border-top: 1px solid #eee;
         border-bottom: 1px solid #eee;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: linear-gradient(to right, #fafafa, #ffffff);
+        background: #fafafa;
         cursor: pointer;
     }
     
-    .privacy-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
     .public-badge, .private-badge {
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
     }
     
     .public-badge {
-        background: #e3f2fd;
-        color: #1565c0;
-        border: 1px solid #bbdefb;
+        background: #d1ecf1;
+        color: #0c5460;
     }
     
     .private-badge {
-        background: #fce4ec;
-        color: #c2185b;
-        border: 1px solid #f8bbd9;
-    }
-    
-    /* Бейдж обследований в заголовке */
-    .survey-badge {
-        background: linear-gradient(135deg, #4CAF50, #2E7D32);
-        color: white;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .survey-badge i {
-        font-size: 12px;
+        background: #f8d7da;
+        color: #721c24;
     }
     
     .field-body {
-        padding: 24px;
+        padding: 15px;
         flex-grow: 1;
         cursor: pointer;
     }
     
     .crop-info {
-        margin-bottom: 24px;
-        background: #f8f9fa;
-        padding: 18px;
-        border-radius: 10px;
-        border-left: 4px solid #47866A;
+        margin-bottom: 15px;
     }
     
     .info-item {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 10px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #e9ecef;
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #f0f0f0;
     }
     
     .info-item:last-child {
@@ -680,256 +506,140 @@
     }
     
     .label {
-        color: #6c757d;
-        font-size: 14px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        color: #666;
+        font-size: 13px;
     }
     
     .value {
-        font-weight: 600;
-        color: #343a40;
-        font-size: 15px;
+        font-weight: 500;
+        color: #333;
+        font-size: 13px;
         text-align: right;
         max-width: 60%;
+        word-break: break-word;
     }
     
-    /* Статистика */
     .field-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        padding: 18px;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-radius: 12px;
-        margin-top: 16px;
-        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 10px;
     }
     
     .stat-item {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 10px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        gap: 8px;
+        flex: 1;
     }
     
     .stat-icon {
-        font-size: 28px;
-        width: 50px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #47866A, #5CA08A);
-        color: white;
-        border-radius: 10px;
+        font-size: 20px;
+        flex-shrink: 0;
     }
     
     .stat-value {
         display: block;
-        font-weight: 700;
-        font-size: 18px;
-        color: #212529;
-        margin-bottom: 2px;
+        font-weight: bold;
+        font-size: 14px;
+        color: #47866A;
     }
     
     .stat-label {
         display: block;
-        font-size: 12px;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    /* Блок обследований */
-    .last-survey-info {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px;
-        background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
-        border-radius: 10px;
-        border: 1px solid #C8E6C9;
-        margin-top: 20px;
-    }
-    
-    .survey-icon {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #4CAF50, #2E7D32);
-        color: white;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-    }
-    
-    .survey-details {
-        flex-grow: 1;
-    }
-    
-    .survey-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: #2E7D32;
-        margin-bottom: 4px;
-    }
-    
-    .survey-date {
-        font-size: 13px;
-        color: #388E3C;
-        font-weight: 500;
-    }
-    
-    .btn-add-survey {
-        background: white;
-        color: #4CAF50;
-        border: 2px solid #4CAF50;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
-    }
-    
-    .btn-add-survey:hover {
-        background: #4CAF50;
-        color: white;
-        transform: translateY(-2px);
-    }
-    
-    /* Блок без обследований */
-    .no-surveys {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 20px;
-        background: linear-gradient(135deg, #FFF3E0, #FFECB3);
-        border-radius: 10px;
-        border: 1px solid #FFE082;
-        margin-top: 20px;
-    }
-    
-    .no-survey-icon {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #FF9800, #F57C00);
-        color: white;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-    }
-    
-    .no-survey-text {
-        flex-grow: 1;
-    }
-    
-    .no-survey-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: #EF6C00;
-        margin-bottom: 4px;
-    }
-    
-    .no-survey-subtitle {
-        font-size: 13px;
-        color: #F57C00;
-    }
-    
-    .btn-add-survey-primary {
-        background: linear-gradient(135deg, #FF9800, #F57C00);
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
-        box-shadow: 0 2px 4px rgba(255, 152, 0, 0.2);
-    }
-    
-    .btn-add-survey-primary:hover {
-        background: linear-gradient(135deg, #F57C00, #E65100);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        font-size: 11px;
+        color: #666;
     }
     
     .field-footer {
-        padding: 18px 24px;
+        padding: 12px 15px;
         border-top: 1px solid #eee;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: linear-gradient(to right, #fafafa, #ffffff);
+        background: #fafafa;
         cursor: pointer;
     }
     
     .dates {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-    }
-    
-    .date-label {
-        font-size: 12px;
-        color: #6c757d;
-        display: flex;
-        align-items: center;
         gap: 4px;
     }
     
+    .date-label {
+        font-size: 10px;
+        color: #888;
+    }
+    
     .status-badge {
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: bold;
     }
     
     .status-badge.active {
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        background: #d4edda;
         color: #155724;
-        border: 1px solid #c3e6cb;
     }
     
     .status-badge.completed {
-        background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+        background: #d1ecf1;
         color: #0c5460;
-        border: 1px solid #bee5eb;
     }
     
     .status-badge.planned {
-        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        background: #fff3cd;
         color: #856404;
-        border: 1px solid #ffeaa7;
     }
     
     .status-badge.problem {
-        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        background: #f8d7da;
         color: #721c24;
-        border: 1px solid #f5c6cb;
     }
     
-    /* Модальное окно редактирования */
+    /* Пустые поля */
+    .no-fields {
+        text-align: center;
+        padding: 50px 20px;
+        grid-column: 1 / -1;
+    }
+    
+    .no-fields p {
+        font-size: 18px;
+        color: #666;
+        margin-bottom: 20px;
+    }
+    
+    .btn-add-field-large {
+        background: linear-gradient(90deg, #47866A, #5CA08A);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 auto;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-add-field-large:hover {
+        background: linear-gradient(90deg, #3a7557, #4A8C74);
+        transform: translateY(-2px);
+    }
+    
+    .btn-add-field-large span {
+        font-size: 24px;
+    }
+    
+    /* Модальное окно */
     .modal {
         display: none;
         position: fixed;
@@ -938,677 +648,320 @@
         top: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(3px);
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        animation: fadeIn 0.3s ease;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    .modal-dialog {
-        width: 100%;
-        max-width: 600px;
-        animation: slideUp 0.3s ease;
-    }
-    
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        background-color: rgba(0,0,0,0.5);
+        overflow-y: auto;
     }
     
     .modal-content {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        overflow: hidden;
-        border: 1px solid #e0e0e0;
+        background-color: white;
+        margin: 5% auto;
+        padding: 0;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        position: relative;
     }
     
     .modal-header {
         background: linear-gradient(135deg, #47866A, #5CA08A);
         color: white;
-        padding: 24px;
+        padding: 20px;
+        border-radius: 15px 15px 0 0;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     }
     
-    .modal-title {
+    .modal-header h2 {
         margin: 0;
         font-size: 22px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
+        font-weight: 600;
     }
     
-    .btn-close {
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
-        color: white;
+    .close {
         font-size: 28px;
         cursor: pointer;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s;
-        padding: 0;
+        color: white;
+        opacity: 0.8;
+        transition: opacity 0.3s;
     }
     
-    .btn-close:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: rotate(90deg);
+    .close:hover {
+        opacity: 1;
     }
     
-    /* Форма редактирования */
     .modal-body {
-        padding: 0;
-        max-height: 70vh;
-        overflow-y: auto;
-    }
-    
-    .edit-field-form {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    
-    .form-section {
-        padding: 24px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    
-    .form-section:last-child {
-        border-bottom: none;
-    }
-    
-    .section-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: #47866A;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #e9ecef;
-        display: flex;
-        align-items: center;
+        padding: 25px;
     }
     
     .form-group {
         margin-bottom: 20px;
     }
     
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-    }
-    
-    .form-label {
+    .form-group label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600;
-        color: #495057;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    
-    .form-input, .form-select, .form-textarea {
-        width: 100%;
-        padding: 12px 16px;
-        border: 2px solid #e0e0e0;
-        border-radius: 10px;
-        font-size: 15px;
-        transition: all 0.3s;
-        background: white;
+        font-weight: 500;
         color: #333;
+        font-size: 14px;
     }
     
-    .form-input:focus, .form-select:focus, .form-textarea:focus {
-        outline: none;
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+        box-sizing: border-box;
+    }
+    
+    .form-group input[type="text"]:focus,
+    .form-group input[type="number"]:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
         border-color: #47866A;
-        box-shadow: 0 0 0 3px rgba(71, 134, 106, 0.1);
+        outline: none;
     }
     
-    .form-textarea {
-        resize: vertical;
-        min-height: 100px;
-        font-family: inherit;
-    }
-    
-    /* Чекбокс */
     .checkbox-group {
         display: flex;
-        align-items: flex-start;
-        padding: 16px;
-        background: #f8f9fa;
-        border-radius: 10px;
-        border: 2px solid #e9ecef;
-        transition: all 0.3s;
-    }
-    
-    .checkbox-group:hover {
-        border-color: #47866A;
-        background: #f1f8e9;
-    }
-    
-    .checkbox-input {
-        margin-right: 12px;
-        margin-top: 3px;
-        width: 20px;
-        height: 20px;
-        accent-color: #47866A;
-        cursor: pointer;
-    }
-    
-    .checkbox-label {
-        flex: 1;
-        cursor: pointer;
-        display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
     }
     
-    .checkbox-text {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin: 0;
     }
     
-    .checkbox-text strong {
-        color: #212529;
-        font-size: 15px;
+    .checkbox-group label {
+        margin: 0;
+        cursor: pointer;
     }
     
-    .checkbox-text small {
-        color: #6c757d;
-        font-size: 13px;
-    }
-    
-    /* Кнопки модального окна */
     .modal-footer {
-        padding: 24px;
-        background: #f8f9fa;
+        padding: 20px 25px 25px;
+        border-top: 1px solid #eee;
         display: flex;
         justify-content: flex-end;
-        gap: 12px;
-        border-top: 1px solid #e9ecef;
-    }
-    
-    .btn {
-        padding: 12px 28px;
-        border: none;
-        border-radius: 10px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        min-width: 140px;
-    }
-    
-    .btn-cancel {
-        background: #f8f9fa;
-        color: #6c757d;
-        border: 2px solid #dee2e6;
-    }
-    
-    .btn-cancel:hover {
-        background: #e9ecef;
-        color: #495057;
-        border-color: #ced4da;
+        gap: 10px;
     }
     
     .btn-primary {
-        background: linear-gradient(135deg, #47866A, #5CA08A);
+        background: linear-gradient(90deg, #47866A, #5CA08A);
         color: white;
-        border: 2px solid #47866A;
-        box-shadow: 0 4px 6px rgba(71, 134, 106, 0.2);
-    }
-    
-    .btn-primary:hover {
-        background: linear-gradient(135deg, #3a7557, #4A8C74);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(71, 134, 106, 0.3);
-    }
-    
-    .btn-primary:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-        transform: none;
-    }
-    
-    /* Состояния для пустых полей */
-    .no-fields {
-        text-align: center;
-        padding: 60px 20px;
-        grid-column: 1 / -1;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    
-    .no-fields p {
-        font-size: 20px;
-        color: #6c757d;
-        margin-bottom: 30px;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
         font-weight: 500;
-    }
-    
-    .btn-add-field-large {
-        background: linear-gradient(135deg, #47866A, #5CA08A);
-        color: white;
-        border: none;
-        padding: 18px 36px;
-        border-radius: 12px;
-        cursor: pointer;
-        font-weight: 700;
-        font-size: 18px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 0 auto;
-        transition: all 0.3s ease;
-        box-shadow: 0 6px 15px rgba(71, 134, 106, 0.3);
-    }
-    
-    .btn-add-field-large:hover {
-        background: linear-gradient(135deg, #3a7557, #4A8C74);
-        transform: translateY(-3px);
-        box-shadow: 0 10px 25px rgba(71, 134, 106, 0.4);
-    }
-    
-    .btn-add-field-large span {
-        font-size: 28px;
-        font-weight: bold;
-    }
-    
-    .error-message {
-        text-align: center;
-        padding: 40px;
-        color: #dc3545;
-        grid-column: 1 / -1;
-        background: #fff5f5;
-        border-radius: 16px;
-        border: 2px solid #ffcdd2;
-    }
-    
-    .error-message p {
-        font-size: 18px;
-        margin-bottom: 10px;
-    }
-    
-    .load-more-container {
-        text-align: center;
-        margin-top: 40px;
-    }
-    
-    .load-more-btn {
-        background: linear-gradient(135deg, #6c757d, #5a6268);
-        color: white;
-        border: none;
-        padding: 14px 32px;
-        border-radius: 10px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 14px;
         transition: all 0.3s;
     }
     
+    .btn-primary:hover {
+        background: linear-gradient(90deg, #3a7557, #4A8C74);
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    
+    /* Кнопка "Показать еще" */
+    .load-more-container {
+        text-align: center;
+        margin-top: 30px;
+    }
+    
+    .load-more-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+    
     .load-more-btn:hover {
-        background: linear-gradient(135deg, #5a6268, #495057);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        background: #5a6268;
     }
     
-    .load-more-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-    }
-    
-    /* Адаптивность */
-    @media (max-width: 768px) {
-        .journal-container {
-            padding: 15px;
-        }
-        
-        .journal-controls {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 12px;
-        }
-        
-        .filter-controls {
-            flex-direction: column;
-            width: 100%;
-        }
-        
-        .filter-select {
-            width: 100%;
-        }
-        
-        .fields-container {
-            grid-template-columns: 1fr;
-            gap: 20px;
-        }
-        
-        .field-card {
-            margin-bottom: 0;
-        }
-        
-        .field-stats {
-            grid-template-columns: 1fr;
-            gap: 10px;
-        }
-        
-        .privacy-badge {
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-start;
-        }
-        
-        .last-survey-info,
-        .no-surveys {
-            flex-direction: column;
-            text-align: center;
-            gap: 12px;
-        }
-        
-        .survey-details,
-        .no-survey-text {
-            text-align: center;
-        }
-        
-        .btn-add-survey,
-        .btn-add-survey-primary {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .modal-dialog {
-            margin: 0;
-            max-width: 95%;
-        }
-        
-        .form-row {
-            grid-template-columns: 1fr;
-            gap: 12px;
-        }
-        
-        .modal-header,
-        .modal-footer,
-        .form-section {
-            padding: 20px;
-        }
-        
-        .btn {
-            min-width: 120px;
-            padding: 12px 20px;
-        }
-        
-        .field-header {
-            padding: 20px;
-        }
-        
-        .field-body {
-            padding: 20px;
-        }
-        
-        .field-footer {
-            padding: 16px 20px;
-        }
-    }
-    
-    @media (max-width: 480px) {
-        .journal-header h1 {
-            font-size: 24px;
-        }
-        
-        .btn-add-field,
-        .btn-add-field-large {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .modal-title {
-            font-size: 18px;
-        }
-        
-        .modal-header {
-            padding: 20px;
-        }
-        
-        .section-title {
-            font-size: 15px;
-        }
-        
-        .btn {
-            width: 100%;
-        }
-        
-        .modal-footer {
-            flex-direction: column;
-        }
-        
-        .field-name {
-            font-size: 18px;
-        }
+    /* Сообщение об ошибке */
+    .error-message {
+        text-align: center;
+        padding: 30px;
+        color: #dc3545;
+        grid-column: 1 / -1;
+        font-size: 16px;
     }
 </style>
 
 <script>
-// Модальное окно редактирования
-const editModal = document.getElementById('editFieldModal');
-let isSubmitting = false;
-
-function openEditModal(event, fieldId) {
-    event.stopPropagation();
+    // Функции для модального окна
+    function openEditModal(fieldId) {
+        // Загружаем данные поля
+        fetch(`/fields/${fieldId}/get-data`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const field = data.field;
+                    
+                    // Заполняем форму
+                    document.getElementById('editFieldId').value = field.field_id;
+                    document.getElementById('editFieldName').value = field.field_name || '';
+                    document.getElementById('editFieldArea').value = field.field_area || '';
+                    
+                    // Заполняем crop_info
+                    if (field.crop_info) {
+                        document.getElementById('editCropName').value = field.crop_info.crop_name || '';
+                        document.getElementById('editVariety').value = field.crop_info.variety || '';
+                        document.getElementById('editVegetationPeriod').value = field.crop_info.vegetation_period || '';
+                    }
+                    
+                    document.getElementById('editStatus').value = field.status || 'active';
+                    document.getElementById('editIsPublic').checked = field.is_public || false;
+                    document.getElementById('editDescription').value = field.description || '';
+                    
+                    // Показываем модальное окно
+                    document.getElementById('editFieldModal').style.display = 'block';
+                } else {
+                    alert('Ошибка загрузки данных поля');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при загрузке данных');
+            });
+    }
     
-    // Показываем загрузку
-    const submitBtn = document.getElementById('submitEditBtn');
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Загрузка...';
-    submitBtn.disabled = true;
+    function closeModal() {
+        document.getElementById('editFieldModal').style.display = 'none';
+    }
     
-    // Показываем модальное окно
-    editModal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    // Закрытие модального окна при клике вне его
+    window.onclick = function(event) {
+        const modal = document.getElementById('editFieldModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
     
-    // Загружаем данные поля
-    fetch(`/fields/${fieldId}/get-data`)
+    // Обработка отправки формы
+    document.getElementById('editFieldForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const fieldId = document.getElementById('editFieldId').value;
+        
+        // Показываем индикатор загрузки
+        const submitBtn = this.querySelector('.btn-primary');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Сохранение...';
+        submitBtn.disabled = true;
+        
+        fetch(`/fields/${fieldId}/update`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const field = data.field;
-                
-                // Заполняем форму
-                document.getElementById('editFieldId').value = field.field_id;
-                document.getElementById('editFieldName').value = field.field_name || '';
-                document.getElementById('editFieldArea').value = field.field_area || '';
-                
-                // Заполняем crop_info
-                if (field.crop_info) {
-                    document.getElementById('editCropName').value = field.crop_info.crop_name || '';
-                    document.getElementById('editVariety').value = field.crop_info.variety || '';
-                    document.getElementById('editVegetationPeriod').value = field.crop_info.vegetation_period || '';
-                }
-                
-                document.getElementById('editStatus').value = field.status || 'active';
-                document.getElementById('editIsPublic').checked = field.is_public || false;
-                document.getElementById('editDescription').value = field.description || '';
-                
-                // Возвращаем кнопку в нормальное состояние
-                submitBtn.innerHTML = '<i class="fas fa-save me-1"></i> Сохранить изменения';
-                submitBtn.disabled = false;
-            } else {
-                alert('Ошибка загрузки данных поля');
-                closeEditModal();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Произошла ошибка при загрузке данных');
-            closeEditModal();
-        });
-}
-
-function closeEditModal() {
-    editModal.style.display = 'none';
-    document.body.style.overflow = 'auto';
-    isSubmitting = false;
-    
-    // Сбрасываем форму
-    document.getElementById('editFieldForm').reset();
-    document.getElementById('submitEditBtn').innerHTML = '<i class="fas fa-save me-1"></i> Сохранить изменения';
-    document.getElementById('submitEditBtn').disabled = false;
-}
-
-// Закрытие модального окна при клике вне его
-window.addEventListener('click', function(event) {
-    if (event.target === editModal) {
-        if (!isSubmitting) {
-            closeEditModal();
-        }
-    }
-});
-
-// Обработка отправки формы
-document.getElementById('editFieldForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    if (isSubmitting) return;
-    
-    isSubmitting = true;
-    const submitBtn = document.getElementById('submitEditBtn');
-    const originalText = submitBtn.innerHTML;
-    
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Сохранение...';
-    submitBtn.disabled = true;
-    
-    const formData = new FormData(this);
-    const fieldId = document.getElementById('editFieldId').value;
-    
-    fetch(`/fields/${fieldId}/update`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            submitBtn.innerHTML = '<i class="fas fa-check me-1"></i> Успешно!';
-            
-            // Через 1 секунду закрываем и перезагружаем
-            setTimeout(() => {
-                closeEditModal();
+                closeModal();
                 location.reload();
-            }, 1000);
-        } else {
-            alert('Ошибка: ' + data.message);
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-            isSubmitting = false;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Произошла ошибка при сохранении');
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-        isSubmitting = false;
-    });
-});
-
-// Валидация формы
-document.getElementById('editFieldForm').addEventListener('input', function() {
-    const name = document.getElementById('editFieldName').value.trim();
-    const area = document.getElementById('editFieldArea').value;
-    const submitBtn = document.getElementById('submitEditBtn');
-    
-    if (name && area && parseFloat(area) > 0) {
-        submitBtn.disabled = false;
-    } else {
-        submitBtn.disabled = true;
-    }
-});
-
-// Фильтрация полей
-function filterFields() {
-    const privacyFilter = document.getElementById('filterPrivacy').value;
-    const sortFilter = document.getElementById('filterSort').value;
-    
-    const fieldCards = document.querySelectorAll('.field-card');
-    fieldCards.forEach(card => {
-        const isPublic = card.querySelector('.public-badge') !== null;
-        
-        if (privacyFilter === 'all') {
-            card.style.display = '';
-        } else if (privacyFilter === 'public' && !isPublic) {
-            card.style.display = 'none';
-        } else if (privacyFilter === 'private' && isPublic) {
-            card.style.display = 'none';
-        } else {
-            card.style.display = '';
-        }
-    });
-}
-
-document.getElementById('filterPrivacy').addEventListener('change', filterFields);
-document.getElementById('filterSort').addEventListener('change', filterFields);
-
-// Загрузка дополнительных полей
-function loadMoreFields() {
-    const btn = document.querySelector('.load-more-btn');
-    const currentCount = document.querySelectorAll('.field-card').length;
-    
-    btn.disabled = true;
-    btn.textContent = 'Загрузка...';
-    
-    fetch(`/my-fields/load-more/${currentCount}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.fields && data.fields.length > 0) {
-                // Здесь будет логика добавления новых полей
             } else {
-                document.querySelector('.load-more-container').style.display = 'none';
+                alert('Ошибка: ' + (data.message || 'Неизвестная ошибка'));
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Ошибка загрузки данных');
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = 'Показать еще';
+            alert('Произошла ошибка при сохранении');
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
         });
-}
-
-// Закрытие модального окна по Escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && editModal.style.display === 'flex' && !isSubmitting) {
-        closeEditModal();
+    });
+    
+    // Фильтрация полей
+    function filterFields() {
+        const privacyFilter = document.getElementById('filterPrivacy').value;
+        const sortFilter = document.getElementById('filterSort').value;
+        
+        const fieldCards = document.querySelectorAll('.field-card');
+        
+        // Сначала показываем все карточки
+        fieldCards.forEach(card => {
+            const isPublic = card.querySelector('.public-badge') !== null;
+            
+            if (privacyFilter === 'all') {
+                card.style.display = '';
+            } else if (privacyFilter === 'public' && !isPublic) {
+                card.style.display = 'none';
+            } else if (privacyFilter === 'private' && isPublic) {
+                card.style.display = 'none';
+            } else {
+                card.style.display = '';
+            }
+        });
+        
+        // Сортировка
+        const visibleCards = Array.from(fieldCards).filter(card => card.style.display !== 'none');
+        
+        // Реализация сортировки может быть добавлена позже
     }
-});
+    
+    document.getElementById('filterPrivacy').addEventListener('change', filterFields);
+    document.getElementById('filterSort').addEventListener('change', filterFields);
+    
+    // Загрузка дополнительных полей
+    function loadMoreFields() {
+        const btn = document.querySelector('.load-more-btn');
+        const currentCount = document.querySelectorAll('.field-card').length;
+        
+        btn.disabled = true;
+        btn.textContent = 'Загрузка...';
+        
+        fetch(`/my-fields/load-more/${currentCount}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.fields && data.fields.length > 0) {
+                    // Реализация добавления новых полей
+                    btn.textContent = 'Показать еще';
+                    btn.disabled = false;
+                } else {
+                    document.querySelector('.load-more-container').style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка загрузки данных');
+                btn.textContent = 'Показать еще';
+                btn.disabled = false;
+            });
+    }
 </script>
 @endsection

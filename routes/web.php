@@ -36,28 +36,31 @@ Route::prefix('profile')->group(function () {
     Route::post('/update', [ProfileController::class, 'update'])->name('profile.update');
 });
 
-// Админ-панель
+// Админ-панель - ПЕРЕНЕСИТЕ ЭТО ВВЕРХ, ПЕРЕД ДРУГИМИ МАРШРУТАМИ
 Route::prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
     Route::get('/fields', [AdminController::class, 'fields'])->name('admin.fields');
     Route::get('/roles', [AdminController::class, 'roles'])->name('admin.roles');
-    Route::get('/users/export', [AdminController::class, 'exportUsers'])->name('admin.users.export');
-    
-    // Управление ролями
-    Route::post('/users/{user}/assign-role', [AdminController::class, 'assignRole'])->name('admin.users.assignRole');
-    Route::delete('/users/{user}/remove-role/{role}', [AdminController::class, 'removeRole'])->name('admin.users.removeRole');
-    Route::post('/roles', [AdminController::class, 'createRole'])->name('admin.roles.store');
-    Route::put('/roles/{role}', [AdminController::class, 'updateRole'])->name('admin.roles.update');
-    Route::delete('/roles/{role}', [AdminController::class, 'deleteRole'])->name('admin.roles.delete');
     
     // Управление пользователями
+    Route::delete('/users/{user}', [AdminController::class, 'deleteUser'])->name('admin.users.delete');
     Route::post('/users/{user}/activate', [AdminController::class, 'activateUser'])->name('admin.users.activate');
     Route::post('/users/{user}/deactivate', [AdminController::class, 'deactivateUser'])->name('admin.users.deactivate');
     
-    // Удаление
-    Route::delete('/users/{user}', [AdminController::class, 'deleteUser'])->name('admin.users.delete');
+    // Управление ролями
+    Route::post('/users/{user}/roles', [AdminController::class, 'assignRole'])->name('admin.users.assignRole');
+    Route::delete('/users/{user}/roles/{role}', [AdminController::class, 'removeRole'])->name('admin.users.removeRole');
+    Route::post('/roles', [AdminController::class, 'createRole'])->name('admin.roles.store');
+    Route::delete('/roles/{role}', [AdminController::class, 'deleteRole'])->name('admin.roles.delete');
+    
+    // Управление полями
     Route::delete('/fields/{field}', [AdminController::class, 'deleteField'])->name('admin.fields.delete');
+    
+    // Экспорт и импорт пользователей
+    Route::get('/users/export', [AdminController::class, 'exportUsers'])->name('admin.users.export');
+    Route::post('/users/import', [AdminController::class, 'importUsers'])->name('admin.users.import');
+    Route::get('/users/import/template', [AdminController::class, 'downloadImportTemplate'])->name('admin.users.import.template');
 });
 
 // Журнал наблюдений (публичные поля)
@@ -112,8 +115,7 @@ Route::prefix('fields')->group(function () {
             ->name('surveys.show');
         Route::delete('/{survey}', [AgronomicSurveysController::class, 'destroy'])
             ->name('surveys.destroy');
-        Route::post('/fields/{field}/surveys/{survey}/update', [AgronomicSurveysController::class, 'update'])
-    ->name('surveys.update');
+        Route::post('/{survey}/update', [AgronomicSurveysController::class, 'update']);
     });
     
     // Переключение приватности поля

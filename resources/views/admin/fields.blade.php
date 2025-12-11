@@ -1,39 +1,27 @@
 @extends('sample.main')
 
+@section('header-title')
+Управление полями
+@endsection
+
 @section('content')
-<div class="admin-container">
-    <!-- Заголовок и навигация -->
-    <div class="admin-header">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h1 class="admin-title">
-                    <i class="fas fa-map-marked-alt me-2"></i>Управление полями
-                </h1>
-                <p class="admin-subtitle">Всего полей: <span class="badge-count">{{ $fields->total() }}</span></p>
-            </div>
-            <div class="admin-actions">
-                <a href="/" class="btn-back">
-                    <i class="fas fa-arrow-left me-1"></i> На главную
-                </a>
-            </div>
-        </div>
-        
-        <div class="admin-navigation">
-            <a href="{{ route('admin.dashboard') }}" class="nav-item">
-                <i class="fas fa-tachometer-alt me-2"></i> Дашборд
-            </a>
-            <a href="{{ route('admin.users') }}" class="nav-item">
-                <i class="fas fa-users me-2"></i> Пользователи
-            </a>
-            <a href="{{ route('admin.fields') }}" class="nav-item active">
-                <i class="fas fa-map-marked-alt me-2"></i> Поля
-            </a>
-            <a href="{{ route('admin.roles') }}" class="nav-item">
-                <i class="fas fa-user-shield me-2"></i> Роли
-            </a>
+<!-- Добавляем Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="roles-main-container">
+    <!-- Заголовок и навигация ТОЧНО КАК В РОЛЯХ И ПОЛЬЗОВАТЕЛЯХ -->
+    <div class="roles-header">
+        <h1><i class="fas fa-map-marked-alt me-2"></i>Управление полями</h1>
+        <div class="roles-nav">
+            <a href="{{ route('admin.dashboard') }}">📊 Дашборд</a>
+            <a href="{{ route('admin.users') }}">👥 Пользователи</a>
+            <a href="{{ route('admin.fields') }}" class="nav-active">📍 Поля</a>
+            <a href="{{ route('admin.roles') }}">🛡️ Роли</a>
+            <a href="/" class="nav-exit">← На сайт</a>
         </div>
     </div>
     
+    <!-- Остальной код остается без изменений -->
     <!-- Поиск и фильтры -->
     <div class="search-section">
         <form method="GET" action="{{ route('admin.fields') }}">
@@ -234,99 +222,66 @@
 </div>
 
 <style>
-/* Основные стили */
-.admin-container {
+/* Основные стили - ТОЧНО КАК В РОЛЯХ И ПОЛЬЗОВАТЕЛЯХ */
+.roles-main-container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 30px 20px;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-/* Заголовок */
-.admin-header {
-    margin-bottom: 30px;
+/* Заголовок и навигация - ТОЧНО КАК В РОЛЯХ */
+.roles-header {
+    margin-bottom: 40px;
 }
 
-.admin-title {
-    color: #2c3e50;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0;
+.roles-header h1 {
+    color: #47866A;
+    margin: 0 0 20px 0;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
 }
 
-.admin-subtitle {
-    color: #7f8c8d;
-    font-size: 15px;
-    margin: 8px 0 0 0;
+.roles-nav {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
 }
 
-.badge-count {
-    background: #10b981;
-    color: white;
-    padding: 4px 12px;
+.roles-nav a {
+    padding: 8px 16px;
     border-radius: 20px;
-    font-weight: 600;
+    text-decoration: none;
     font-size: 14px;
-}
-
-.btn-back {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 8px;
-    text-decoration: none;
     font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    transition: all 0.3s;
+    background: #f8f9fa;
+    color: #666;
 }
 
-.btn-back:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
-    color: white;
-    text-decoration: none;
+.roles-nav a:hover {
+    background: #e9ecef;
+    color: #333;
 }
 
-/* Навигация */
-.admin-navigation {
-    display: flex;
-    gap: 5px;
-    background: white;
-    border-radius: 12px;
-    padding: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    margin-top: 25px;
+.nav-active {
+    background: linear-gradient(90deg, #47866A, #5CA08A) !important;
+    color: white !important;
 }
 
-.nav-item {
-    flex: 1;
-    padding: 14px 20px;
-    text-decoration: none;
-    color: #64748b;
-    font-weight: 500;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    font-size: 15px;
+.nav-exit {
+    margin-left: auto;
+    background: #6c757d !important;
+    color: white !important;
 }
 
-.nav-item:hover {
-    background: #f8fafc;
-    color: #334155;
-    transform: translateY(-1px);
+.nav-exit:hover {
+    background: #5a6268 !important;
 }
 
-.nav-item.active {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-/* Поиск */
+/* Остальные стили остаются без изменений */
 .search-section {
     margin-bottom: 30px;
 }
@@ -794,28 +749,22 @@
     margin: 0;
 }
 
-/* Адаптивность */
-@media (max-width: 1200px) {
-    .admin-container {
-        padding: 20px 15px;
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
+/* Адаптивность навигации - ТОЧНО КАК В РОЛЯХ */
 @media (max-width: 768px) {
-    .admin-navigation {
-        flex-wrap: wrap;
+    .roles-main-container {
+        padding: 15px;
     }
     
-    .nav-item {
-        flex: 0 0 calc(50% - 2.5px);
-        font-size: 14px;
-        padding: 12px 15px;
+    .roles-nav {
+        flex-direction: column;
     }
     
+    .nav-exit {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    /* Остальная адаптивность */
     .search-filters {
         flex-direction: column;
     }
@@ -849,21 +798,12 @@
 }
 
 @media (max-width: 480px) {
-    .admin-title {
+    .roles-header h1 {
         font-size: 24px;
     }
     
     .admin-subtitle {
         font-size: 14px;
-    }
-    
-    .btn-back {
-        padding: 8px 15px;
-        font-size: 14px;
-    }
-    
-    .nav-item {
-        flex: 0 0 100%;
     }
 }
 </style>
