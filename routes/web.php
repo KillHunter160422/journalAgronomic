@@ -36,7 +36,7 @@ Route::prefix('profile')->group(function () {
     Route::post('/update', [ProfileController::class, 'update'])->name('profile.update');
 });
 
-// Админ-панель - ПЕРЕНЕСИТЕ ЭТО ВВЕРХ, ПЕРЕД ДРУГИМИ МАРШРУТАМИ
+// Админ-панель
 Route::prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
@@ -45,6 +45,7 @@ Route::prefix('admin')->group(function () {
     
     // Управление пользователями
     Route::delete('/users/{user}', [AdminController::class, 'deleteUser'])->name('admin.users.delete');
+    Route::get('/users/{user}/info', [AdminController::class, 'getUserInfo'])->name('admin.users.info');
     Route::post('/users/{user}/activate', [AdminController::class, 'activateUser'])->name('admin.users.activate');
     Route::post('/users/{user}/deactivate', [AdminController::class, 'deactivateUser'])->name('admin.users.deactivate');
     
@@ -52,6 +53,7 @@ Route::prefix('admin')->group(function () {
     Route::post('/users/{user}/roles', [AdminController::class, 'assignRole'])->name('admin.users.assignRole');
     Route::delete('/users/{user}/roles/{role}', [AdminController::class, 'removeRole'])->name('admin.users.removeRole');
     Route::post('/roles', [AdminController::class, 'createRole'])->name('admin.roles.store');
+    Route::put('/roles/{role}', [AdminController::class, 'updateRole'])->name('admin.roles.update');
     Route::delete('/roles/{role}', [AdminController::class, 'deleteRole'])->name('admin.roles.delete');
     
     // Управление полями
@@ -87,6 +89,8 @@ Route::prefix('fields')->group(function () {
     // Статические маршруты ВЫШЕ динамических
     Route::get('/create', [FieldController::class, 'create'])->name('fields.create');
     Route::post('/', [FieldController::class, 'store'])->name('fields.store');
+    
+    // Обновление поля (для AJAX модального окна)
     Route::put('/{field}', [FieldController::class, 'update'])->name('fields.update');
     
     // Операции на поле

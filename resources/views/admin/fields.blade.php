@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <div class="roles-main-container">
-    <!-- Заголовок и навигация ТОЧНО КАК В РОЛЯХ И ПОЛЬЗОВАТЕЛЯХ -->
+    <!-- Заголовок и навигация -->
     <div class="roles-header">
         <h1><i class="fas fa-map-marked-alt me-2"></i>Управление полями</h1>
         <div class="roles-nav">
@@ -21,7 +21,6 @@
         </div>
     </div>
     
-    <!-- Остальной код остается без изменений -->
     <!-- Поиск и фильтры -->
     <div class="search-section">
         <form method="GET" action="{{ route('admin.fields') }}">
@@ -222,14 +221,13 @@
 </div>
 
 <style>
-/* Основные стили - ТОЧНО КАК В РОЛЯХ И ПОЛЬЗОВАТЕЛЯХ */
 .roles-main-container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 30px 20px;
 }
 
-/* Заголовок и навигация - ТОЧНО КАК В РОЛЯХ */
+/* Заголовок и навигация*/
 .roles-header {
     margin-bottom: 40px;
 }
@@ -281,7 +279,6 @@
     background: #5a6268 !important;
 }
 
-/* Остальные стили остаются без изменений */
 .search-section {
     margin-bottom: 30px;
 }
@@ -749,7 +746,7 @@
     margin: 0;
 }
 
-/* Адаптивность навигации - ТОЧНО КАК В РОЛЯХ */
+/* Адаптивность навигации */
 @media (max-width: 768px) {
     .roles-main-container {
         padding: 15px;
@@ -764,7 +761,6 @@
         margin-top: 10px;
     }
     
-    /* Остальная адаптивность */
     .search-filters {
         flex-direction: column;
     }

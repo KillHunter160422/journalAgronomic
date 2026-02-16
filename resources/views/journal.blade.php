@@ -31,7 +31,6 @@
 
     <div class="fields-container">
         <?php
-        use App\Models\Field;
         
         $currentUserId = php_auth_check() ? php_session('user_id') : null;
         

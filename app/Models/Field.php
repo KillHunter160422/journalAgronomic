@@ -109,4 +109,22 @@ class Field extends Model
             });
         }
     }
+    public function edit($fieldId, $operationId)
+{
+    $field = Field::findOrFail($fieldId);
+    $operation = Operation::findOrFail($operationId);
+    
+    $fields_has_operation = FieldOperation::where('field_id', $fieldId)
+        ->where('operation_id', $operationId)
+        ->first();
+    
+    $crops = CropCatalog::all();
+    
+    return view('operations.edit', compact(
+        'field',
+        'operation',
+        'fields_has_operation',
+        'crops'
+    ));
+}
 }

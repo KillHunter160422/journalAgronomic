@@ -931,7 +931,7 @@
         // Сортировка
         const visibleCards = Array.from(fieldCards).filter(card => card.style.display !== 'none');
         
-        // Реализация сортировки может быть добавлена позже
+        
     }
     
     document.getElementById('filterPrivacy').addEventListener('change', filterFields);

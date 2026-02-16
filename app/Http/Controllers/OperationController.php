@@ -73,7 +73,7 @@ class OperationController extends Controller
         // Создаем связь в fields_has_operation
         DB::table('fields_has_operation')->insert([
             'field_id' => $fieldId,
-            'operation_id' => $operationId, // или operational_id, смотря как называется поле
+            'operation_id' => $operationId,
             'crop_id' => $validated['crop_id'] ?? null,
             'season_name' => $validated['season_name'] ?? null,
             'applied_materials' => $validated['applied_materials'] ?? null,

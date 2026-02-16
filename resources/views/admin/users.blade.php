@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <div class="admin-container">
-    <!-- Заголовок и навигация ТОЧНО КАК В РОЛЯХ -->
+    <!-- Заголовок и навигация -->
     <div class="roles-header">
         <h1><i class="fas fa-users me-2"></i>Управление пользователями</h1>
         <div class="roles-nav">
@@ -125,13 +125,9 @@
                     <i class="fas fa-search me-1"></i> Применить
                 </button>
                 
-                <!-- Кнопки экспорта и импорта -->
+                <!-- Кнопка экспорта -->
                 <button type="button" class="export-btn" onclick="toggleExportPanel()">
                     <i class="fas fa-file-export me-1"></i> Экспорт
-                </button>
-                
-                <button type="button" class="import-btn" onclick="toggleImportPanel()">
-                    <i class="fas fa-file-import me-1"></i> Импорт
                 </button>
             </div>
         </form>
@@ -179,7 +175,7 @@
                 
                 <div class="export-section">
                     <label class="export-label">
-                        <i class="fas fa-columns me-2"></i>Выберите колонки
+                        <i class="fas fa-columns me-2"></i>Выберите колонки для экспорта
                     </label>
                     <div class="columns-grid">
                         <label class="column-option">
@@ -199,16 +195,20 @@
                             <span>Полное имя</span>
                         </label>
                         <label class="column-option">
-                            <input type="checkbox" name="columns[]" value="roles">
-                            <span>Роли</span>
-                        </label>
-                        <label class="column-option">
                             <input type="checkbox" name="columns[]" value="created_at" checked>
                             <span>Дата регистрации</span>
                         </label>
                         <label class="column-option">
-                            <input type="checkbox" name="columns[]" value="fields_count">
+                            <input type="checkbox" name="columns[]" value="fields_count" checked>
                             <span>Количество полей</span>
+                        </label>
+                        <label class="column-option">
+                            <input type="checkbox" name="columns[]" value="total_area" checked>
+                            <span>Общая площадь (га)</span>
+                        </label>
+                        <label class="column-option">
+                            <input type="checkbox" name="columns[]" value="field_details">
+                            <span>Детали полей (название + га)</span>
                         </label>
                     </div>
                 </div>
@@ -221,10 +221,6 @@
                         <label class="filter-option">
                             <input type="checkbox" name="filters[]" value="with_fields">
                             <span>Только пользователи с полями</span>
-                        </label>
-                        <label class="filter-option">
-                            <input type="checkbox" name="filters[]" value="with_roles">
-                            <span>Только пользователи с ролями</span>
                         </label>
                         <label class="filter-option">
                             <input type="checkbox" name="filters[]" value="active_only">
@@ -240,106 +236,6 @@
                 </button>
                 <button type="submit" class="confirm-export-btn">
                     <i class="fas fa-download me-1"></i> Экспортировать
-                </button>
-            </div>
-        </form>
-    </div>
-    
-    <!-- Панель импорта -->
-    <div class="import-panel" id="importPanel" style="display: none;">
-        <div class="import-header">
-            <h4><i class="fas fa-file-import me-2"></i>Импорт данных пользователей</h4>
-            <button type="button" class="close-panel-btn" onclick="toggleImportPanel()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        
-        <form method="POST" action="{{ route('admin.users.import') }}" enctype="multipart/form-data" class="import-form">
-            @csrf
-            <div class="import-options">
-                <div class="import-section">
-                    <label class="import-label">
-                        <i class="fas fa-file-upload me-2"></i>Выберите файл для импорта
-                    </label>
-                    <div class="file-upload-area" id="fileUploadArea">
-                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                        <p class="upload-text">Перетащите файл сюда или нажмите для выбора</p>
-                        <input type="file" name="import_file" id="importFile" accept=".csv,.xlsx,.xls" class="file-input" required>
-                        <p class="file-types">Поддерживаемые форматы: CSV, Excel</p>
-                    </div>
-                    <div class="file-info" id="fileInfo" style="display: none;">
-                        <div class="file-details">
-                            <i class="fas fa-file"></i>
-                            <div>
-                                <span class="file-name" id="fileName"></span>
-                                <span class="file-size" id="fileSize"></span>
-                            </div>
-                            <button type="button" class="remove-file-btn" onclick="removeFile()">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="import-section">
-                    <label class="import-label">
-                        <i class="fas fa-cog me-2"></i>Настройки импорта
-                    </label>
-                    <div class="import-settings">
-                        <div class="setting-option">
-                            <label>
-                                <input type="checkbox" name="skip_duplicates" checked>
-                                <span>Пропускать дубликаты (по email)</span>
-                            </label>
-                        </div>
-                        <div class="setting-option">
-                            <label>
-                                <input type="checkbox" name="send_welcome_email">
-                                <span>Отправить приветственное письмо новым пользователям</span>
-                            </label>
-                        </div>
-                        <div class="setting-option">
-                            <label>
-                                <input type="checkbox" name="assign_default_role" checked>
-                                <span>Назначать роль "user" новым пользователям</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="import-section">
-                    <label class="import-label">
-                        <i class="fas fa-info-circle me-2"></i>Требования к файлу
-                    </label>
-                    <div class="requirements">
-                        <div class="requirement-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Файл должен содержать колонки: email, username</span>
-                        </div>
-                        <div class="requirement-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Опциональные колонки: fullname</span>
-                        </div>
-                        <div class="requirement-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Максимальный размер файла: 10MB</span>
-                        </div>
-                        <div class="requirement-item">
-                            <i class="fas fa-download"></i>
-                            <a href="{{ route('admin.users.import.template') }}" class="template-link">
-                                <i class="fas fa-file-download me-1"></i> Скачать шаблон CSV
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="import-actions">
-                <button type="button" class="cancel-btn" onclick="toggleImportPanel()">
-                    <i class="fas fa-times me-1"></i> Отмена
-                </button>
-                <button type="submit" class="confirm-import-btn">
-                    <i class="fas fa-upload me-1"></i> Импортировать
                 </button>
             </div>
         </form>
@@ -498,12 +394,12 @@
                         <div class="action-buttons">
                             <button type="button" 
                                     class="action-btn edit-btn"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#viewUserModal{{ $user->user_id }}"
-                                    title="Просмотр">
+                                    onclick="showUserInfo({{ $user->user_id }})"
+                                    title="Просмотр профиля">
                                 <i class="fas fa-eye"></i>
                             </button>
                             
+                            <!-- Кнопки управления пользователями -->
                             @if($user->user_id != session('user_id'))
                                 @if($user->is_active ?? true)
                                 <form method="POST" 
@@ -551,108 +447,35 @@
     </div>
 </div>
 
-<!-- Модальные окна -->
-@foreach($users as $user)
-<div class="modal fade" id="viewUserModal{{ $user->user_id }}" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-user-circle me-2"></i>Профиль пользователя: {{ $user->username }}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="user-profile">
-                    <div class="profile-header">
-                        <div class="profile-avatar">
-                            @if($user->avatar_url)
-                                <img src="{{ $user->avatar_url }}" 
-                                     alt="{{ $user->username }}" 
-                                     class="profile-avatar-img">
-                            @else
-                                <div class="profile-avatar-default">
-                                    {{ strtoupper(substr($user->username, 0, 2)) }}
-                                </div>
-                            @endif
-                        </div>
-                        <div class="profile-info">
-                            <h3 class="profile-name">{{ $user->username }}</h3>
-                            <p class="profile-email">{{ $user->email }}</p>
-                            <div class="profile-id">ID: {{ $user->user_id }}</div>
-                            @if(isset($user->is_active))
-                                <div class="profile-status {{ $user->is_active ? 'status-active' : 'status-inactive' }}">
-                                    {{ $user->is_active ? 'Активен' : 'Неактивен' }}
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                    
-                    <div class="profile-details">
-                        <div class="detail-row">
-                            <div class="detail-label">
-                                <i class="fas fa-user-tag me-2"></i>Полное имя
-                            </div>
-                            <div class="detail-value">{{ $user->fullname ?: 'Не указано' }}</div>
-                        </div>
-                        
-                        <div class="detail-row">
-                            <div class="detail-label">
-                                <i class="fas fa-calendar-alt me-2"></i>Дата регистрации
-                            </div>
-                            <div class="detail-value">{{ date('d.m.Y H:i:s', strtotime($user->created_at)) }}</div>
-                        </div>
-                        
-                        <div class="detail-row">
-                            <div class="detail-label">
-                                <i class="fas fa-shield-alt me-2"></i>Роли
-                            </div>
-                            <div class="detail-value">
-                                @if(!empty($user->roles) && is_array($user->roles))
-                                    @foreach($user->roles as $role)
-                                    <span class="profile-role-tag {{ $role == 'admin' ? 'role-admin' : ($role == 'moderator' ? 'role-moderator' : 'role-user') }}">
-                                        {{ $role }}
-                                    </span>
-                                    @endforeach
-                                @else
-                                    <span class="text-muted">Нет ролей</span>
-                                @endif
-                            </div>
-                        </div>
-                        
-                        <div class="detail-row">
-                            <div class="detail-label">
-                                <i class="fas fa-map-marked-alt me-2"></i>Количество полей
-                            </div>
-                            <div class="detail-value">
-                                @php
-                                    $fieldCount = DB::table('fields')->where('user_id', $user->user_id)->count();
-                                    echo $fieldCount;
-                                @endphp
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Закрыть
-                </button>
+<!-- Всплывающая форма с информацией о пользователе -->
+<div id="userInfoPopup" class="popup-form">
+    <div class="popup-overlay" onclick="closeUserInfo()"></div>
+    <div class="popup-content">
+        <div class="popup-header">
+            <h3><i class="fas fa-user-circle me-2"></i>Информация о пользователе</h3>
+            <button type="button" class="popup-close" onclick="closeUserInfo()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="popup-body" id="userInfoContent">
+            <!-- Контент будет загружен через JavaScript -->
+            <div class="loading-info">
+                <div class="spinner"></div>
+                <p>Загрузка информации...</p>
             </div>
         </div>
     </div>
 </div>
-@endforeach
 
 <style>
-/* Основные стили - ТОЧНО КАК В РОЛЯХ */
+/* Основные стили */
 .admin-container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 30px 20px;
 }
 
-/* Заголовок и навигация - ТОЧНО КАК В РОЛЯХ */
+/* Заголовок и навигация */
 .roles-header {
     margin-bottom: 40px;
 }
@@ -862,7 +685,7 @@
 }
 
 /* Панель экспорта */
-.export-panel, .import-panel {
+.export-panel {
     background: white;
     border-radius: 12px;
     padding: 0;
@@ -871,7 +694,7 @@
     overflow: hidden;
 }
 
-.export-header, .import-header {
+.export-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -880,7 +703,7 @@
     border-bottom: 1px solid #e2e8f0;
 }
 
-.export-header h4, .import-header h4 {
+.export-header h4 {
     margin: 0;
     color: #475569;
     font-weight: 600;
@@ -907,24 +730,24 @@
     color: #667eea;
 }
 
-.export-form, .import-form {
+.export-form {
     padding: 25px;
 }
 
-.export-options, .import-options {
+.export-options {
     display: flex;
     flex-direction: column;
     gap: 25px;
 }
 
-.export-section, .import-section {
+.export-section {
     background: #f8fafc;
     padding: 20px;
     border-radius: 10px;
     border: 1px solid #e2e8f0;
 }
 
-.export-label, .import-label {
+.export-label {
     display: flex;
     align-items: center;
     color: #475569;
@@ -933,7 +756,7 @@
     font-size: 15px;
 }
 
-.export-label i, .import-label i {
+.export-label i {
     color: #47866A;
 }
 
@@ -1047,7 +870,7 @@
     color: #475569;
 }
 
-.export-actions, .import-actions {
+.export-actions {
     display: flex;
     justify-content: flex-end;
     gap: 15px;
@@ -1091,166 +914,8 @@
     transform: translateY(-2px);
 }
 
-/* Стили для импорта */
-.file-upload-area {
-    border: 2px dashed #cbd5e1;
-    border-radius: 10px;
-    padding: 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    background: white;
-}
-
-.file-upload-area:hover {
-    border-color: #47866A;
-    background: #f8fafc;
-}
-
-.upload-icon {
-    font-size: 48px;
-    color: #94a3b8;
-    margin-bottom: 15px;
-}
-
-.upload-text {
-    color: #64748b;
-    font-size: 16px;
-    margin-bottom: 10px;
-}
-
-.file-input {
-    display: none;
-}
-
-.file-types {
-    color: #94a3b8;
-    font-size: 14px;
-    margin-top: 10px;
-}
-
-.file-info {
-    margin-top: 15px;
-}
-
-.file-details {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 15px;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-}
-
-.file-details i {
-    font-size: 24px;
-    color: #47866A;
-}
-
-.file-name {
-    display: block;
-    font-weight: 500;
-    color: #475569;
-}
-
-.file-size {
-    display: block;
-    color: #94a3b8;
-    font-size: 13px;
-}
-
-.remove-file-btn {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 5px;
-}
-
-.remove-file-btn:hover {
-    color: #ef4444;
-}
-
-.import-settings {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.setting-option {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 15px;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-}
-
-.setting-option label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    width: 100%;
-}
-
-.setting-option span {
-    color: #475569;
-    font-size: 14px;
-}
-
-.requirements {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.requirement-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #475569;
-    font-size: 14px;
-}
-
-.requirement-item i {
-    color: #10b981;
-}
-
-.template-link {
-    color: #47866A;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.template-link:hover {
-    text-decoration: underline;
-    color: #3a7557;
-}
-
-.confirm-import-btn {
-    padding: 12px 30px;
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s;
-}
-
-.confirm-import-btn:hover {
-    background: linear-gradient(90deg, #2563eb, #1d4ed8);
-    transform: translateY(-2px);
-}
-
-/* Кнопки экспорта/импорта в фильтрах */
-.export-btn, .import-btn {
+/* Кнопка экспорта в фильтрах */
+.export-btn {
     padding: 10px 20px;
     border: none;
     border-radius: 8px;
@@ -1259,9 +924,6 @@
     display: flex;
     align-items: center;
     transition: all 0.3s;
-}
-
-.export-btn {
     background: linear-gradient(90deg, #f59e0b, #d97706);
     color: white;
 }
@@ -1271,17 +933,7 @@
     transform: translateY(-2px);
 }
 
-.import-btn {
-    background: linear-gradient(90deg, #8b5cf6, #7c3aed);
-    color: white;
-}
-
-.import-btn:hover {
-    background: linear-gradient(90deg, #7c3aed, #6d28d9);
-    transform: translateY(-2px);
-}
-
-/* Таблица - ТОЧНО КАК В РОЛЯХ */
+/* Таблица */
 .roles-table-container {
     background: white;
     border-radius: 12px;
@@ -1508,7 +1160,7 @@
     font-weight: 500;
 }
 
-/* Кнопки действий - ТОЧНО КАК В ОПЕРАЦИЯХ */
+/* Кнопки действий */
 .col-actions {
     width: 100px;
 }
@@ -1538,9 +1190,33 @@
     color: white;
     border: none;
 }
-
 .edit-btn:hover {
     background: #3a7557;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Кнопки управления пользователями */
+.activate-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.activate-btn:hover {
+    background: #0da271;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.deactivate-btn {
+    background: #f59e0b;
+    color: white;
+    border: none;
+}
+
+.deactivate-btn:hover {
+    background: #d97706;
     transform: translateY(-2px);
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
@@ -1620,55 +1296,109 @@
     display: inline-flex;
 }
 
-/* Модальные окна */
-.modal-header {
-    border-bottom: 2px solid #f0f0f0;
-    padding-bottom: 15px;
+/* Стили для всплывающей формы */
+.popup-form {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
 }
 
-.modal-title {
-    color: #333;
-    font-size: 18px;
+.popup-form.active {
+    display: flex;
+}
+
+.popup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.popup-content {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    z-index: 1001;
+}
+
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(90deg, #47866A, #5CA08A);
+    color: white;
+}
+
+.popup-header h3 {
     margin: 0;
+    font-size: 18px;
+    font-weight: 600;
     display: flex;
     align-items: center;
 }
 
-.modal-title i {
-    color: #47866A;
-    margin-right: 10px;
-}
-
-.modal-body {
-    padding: 20px 0;
-}
-
-.user-profile {
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.profile-header {
+.popup-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 25px;
-    margin-bottom: 30px;
-    padding-bottom: 25px;
-    border-bottom: 1px solid #f0f0f0;
+    justify-content: center;
+    transition: all 0.3s;
 }
 
-.profile-avatar-img {
-    width: 100px;
-    height: 100px;
+.popup-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.popup-body {
+    padding: 20px;
+    max-height: calc(80vh - 70px);
+    overflow-y: auto;
+}
+
+/* Стили для информации о пользователе */
+.user-info-content {
+    font-size: 14px;
+}
+
+.user-avatar {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.user-avatar-img {
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     object-fit: cover;
-    border: 5px solid white;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border: 4px solid #f0f0f0;
+    margin: 0 auto 10px;
 }
 
-.profile-avatar-default {
-    width: 100px;
-    height: 100px;
+.user-avatar-default {
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: linear-gradient(90deg, #47866A, #5CA08A);
     color: white;
@@ -1676,178 +1406,206 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 36px;
-    border: 5px solid white;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    font-size: 24px;
+    margin: 0 auto 10px;
+    border: 4px solid #f0f0f0;
 }
 
-.profile-info {
-    flex: 1;
+.user-basic-info {
+    margin-bottom: 20px;
 }
 
-.profile-name {
-    color: #1e293b;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0 0 8px 0;
-}
-
-.profile-email {
-    color: #64748b;
-    font-size: 16px;
-    margin: 0 0 12px 0;
-}
-
-.profile-id {
-    display: inline-block;
-    background: #e2e8f0;
-    color: #475569;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 500;
-    font-family: monospace;
-}
-
-.profile-details {
-    display: grid;
-    gap: 20px;
-}
-
-.detail-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    padding: 15px;
-    background: #f8fafc;
-    border-radius: 12px;
-    transition: all 0.3s;
-}
-
-.detail-row:hover {
-    background: #f1f5f9;
-    transform: translateX(5px);
-}
-
-.detail-label {
-    flex: 0 0 180px;
-    color: #475569;
+.user-name {
+    font-size: 20px;
     font-weight: 600;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
+    color: #333;
+    margin-bottom: 5px;
+    text-align: center;
 }
 
-.detail-value {
-    flex: 1;
-    color: #1e293b;
-    font-size: 16px;
+.user-email {
+    color: #666;
+    text-align: center;
+    margin-bottom: 10px;
 }
 
-.profile-role-tag {
+.user-id-badge {
     display: inline-block;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 500;
-    margin-right: 8px;
-    margin-bottom: 8px;
-    color: white;
+    background: #f0f0f0;
+    color: #666;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin: 0 auto;
+    text-align: center;
+    display: block;
+    width: fit-content;
 }
 
-.profile-role-tag.role-admin {
-    background: linear-gradient(90deg, #f59e0b, #d97706);
-}
-
-.profile-role-tag.role-moderator {
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-}
-
-.profile-role-tag.role-user {
-    background: linear-gradient(90deg, #10b981, #059669);
-}
-
-/* Кнопки в модальных окнах */
-.modal-footer {
-    border-top: 2px solid #f0f0f0;
-    padding-top: 15px;
-    display: flex;
-    justify-content: flex-end;
+.info-grid {
+    display: grid;
     gap: 15px;
 }
 
-.btn-modal-cancel {
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s;
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+.info-item {
+    padding: 15px;
     background: #f8f9fa;
-    color: #666;
-    border: 1px solid #ddd;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
 }
 
-.btn-modal-cancel:hover {
-    background: #e9ecef;
+.info-label {
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 5px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-value {
     color: #333;
+    font-size: 14px;
 }
 
-/* Добавляем стили для кнопок активации/деактивации */
-.activate-btn {
-    background: #10b981;
-    color: white;
-    border: none;
-}
-
-.activate-btn:hover {
-    background: #0da271;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-.deactivate-btn {
-    background: #f59e0b;
-    color: white;
-    border: none;
-}
-
-.deactivate-btn:hover {
-    background: #d97706;
-    transform: translateY(-2px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-/* Стили для статуса в модальном окне */
-.profile-status {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
+.roles-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
     margin-top: 5px;
 }
 
-.status-active {
-    background: rgba(16, 185, 129, 0.1);
-    color: #065f46;
-    border: 1px solid #10b981;
+.role-tag {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
 }
 
-.status-inactive {
-    background: rgba(245, 158, 11, 0.1);
-    color: #854d0e;
-    border: 1px solid #f59e0b;
+.role-tag.admin {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
 }
 
-/* Дополнительные стили для форм */
-.action-form {
-    display: inline;
+.role-tag.moderator {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.role-tag.user {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.fields-list {
+    margin-top: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.field-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.3s;
+}
+
+.field-item:hover {
+    background: #f8f9fa;
+}
+
+.field-item:last-child {
+    border-bottom: none;
+}
+
+.field-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    text-decoration: none;
+    color: inherit;
+}
+
+.field-name {
+    font-weight: 500;
+    color: #555;
+    flex: 1;
+}
+
+.field-area {
+    color: #666;
+    font-size: 13px;
+    background: #f0f0f0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+}
+
+.field-link:hover .field-name {
+    color: #47866A;
+}
+
+.field-link:hover .field-area {
+    background: #47866A;
+    color: white;
+}
+
+.no-fields {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+}
+
+.view-all-fields {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.view-fields-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background: linear-gradient(90deg, #47866A, #5CA08A);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.view-fields-btn:hover {
+    background: linear-gradient(90deg, #3a7557, #4A8C74);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.loading-info {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f0f0f0;
+    border-top-color: #47866A;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 /* АДАПТИВНОСТЬ */
@@ -1881,12 +1639,11 @@
     
     .filter-select,
     .filter-btn,
-    .export-btn,
-    .import-btn {
+    .export-btn {
         width: 100%;
     }
     
-    .export-panel, .import-panel {
+    .export-panel {
         margin: 0 -15px 20px;
         border-radius: 0;
     }
@@ -1962,24 +1719,11 @@
         justify-content: center;
     }
     
-    .file-upload-area {
-        padding: 20px;
-    }
-    
-    .upload-icon {
-        font-size: 36px;
-        margin-bottom: 10px;
-    }
-    
-    .upload-text {
-        font-size: 14px;
-    }
-    
-    .export-actions, .import-actions {
+    .export-actions {
         flex-direction: column;
     }
     
-    .cancel-btn, .confirm-export-btn, .confirm-import-btn {
+    .cancel-btn, .confirm-export-btn {
         width: 100%;
         justify-content: center;
     }
@@ -2029,16 +1773,6 @@
         font-size: 11px;
     }
     
-    .role-select {
-        font-size: 12px;
-        padding: 5px 8px;
-    }
-    
-    .role-add-btn {
-        padding: 5px 8px;
-        font-size: 12px;
-    }
-    
     .action-buttons {
         gap: 6px;
         flex-wrap: wrap;
@@ -2050,58 +1784,14 @@
         font-size: 13px;
     }
     
-    .profile-header {
-        flex-direction: column;
-        text-align: center;
-        gap: 15px;
+    .popup-content {
+        width: 95%;
+        max-width: 95%;
     }
     
-    .profile-avatar-img,
-    .profile-avatar-default {
-        width: 80px;
-        height: 80px;
-        font-size: 28px;
-    }
-    
-    .profile-name {
-        font-size: 24px;
-    }
-    
-    .detail-row {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .detail-label {
-        flex: 0 0 auto;
-        font-size: 14px;
-    }
-    
-    .detail-value {
-        font-size: 14px;
-    }
-    
-    .alert {
-        padding: 12px 15px;
-        font-size: 14px;
-    }
-    
-    .pagination-wrapper {
-        padding: 15px;
-    }
-    
-    .table-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .table-header h2 {
-        font-size: 18px;
-    }
-    
-    .btn-refresh {
-        width: 32px;
-        height: 32px;
+    .view-fields-btn {
+        padding: 6px 12px;
+        font-size: 12px;
     }
 }
 
@@ -2122,19 +1812,19 @@
         font-size: 12px;
     }
     
-    .export-header, .import-header {
+    .export-header {
         padding: 15px;
     }
     
-    .export-header h4, .import-header h4 {
+    .export-header h4 {
         font-size: 16px;
     }
     
-    .export-form, .import-form {
+    .export-form {
         padding: 15px;
     }
     
-    .export-section, .import-section {
+    .export-section {
         padding: 15px;
     }
     
@@ -2180,120 +1870,98 @@
         font-size: 12px;
     }
     
-    .modal-dialog {
-        margin: 10px;
-    }
-    
-    .modal-header {
+    .popup-header {
         padding: 15px;
     }
     
-    .modal-title {
+    .popup-header h3 {
         font-size: 16px;
     }
     
-    .profile-name {
-        font-size: 20px;
+    .popup-body {
+        padding: 15px;
     }
     
-    .profile-email {
-        font-size: 14px;
+    .user-name {
+        font-size: 18px;
+    }
+    
+    .info-item {
+        padding: 12px;
     }
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-// Функции для управления панелями экспорта/импорта
+// Функции для управления панелями экспорта
 function toggleExportPanel() {
     const exportPanel = document.getElementById('exportPanel');
-    const importPanel = document.getElementById('importPanel');
     
     if (exportPanel.style.display === 'none' || exportPanel.style.display === '') {
         exportPanel.style.display = 'block';
-        if (importPanel.style.display === 'block') {
-            importPanel.style.display = 'none';
-        }
     } else {
         exportPanel.style.display = 'none';
     }
 }
 
-function toggleImportPanel() {
-    const exportPanel = document.getElementById('exportPanel');
-    const importPanel = document.getElementById('importPanel');
+// Показать информацию о пользователе
+function showUserInfo(userId) {
+    const popup = document.getElementById('userInfoPopup');
+    const content = document.getElementById('userInfoContent');
     
-    if (importPanel.style.display === 'none' || importPanel.style.display === '') {
-        importPanel.style.display = 'block';
-        if (exportPanel.style.display === 'block') {
-            exportPanel.style.display = 'none';
-        }
-    } else {
-        importPanel.style.display = 'none';
-    }
+    // Показываем попап с загрузкой
+    popup.classList.add('active');
+    content.innerHTML = `
+        <div class="loading-info">
+            <div class="spinner"></div>
+            <p>Загрузка информации...</p>
+        </div>
+    `;
+    
+    // Загружаем данные через AJAX
+    fetch(`/admin/users/${userId}/info`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки данных');
+            }
+            return response.text();
+        })
+        .then(html => {
+            content.innerHTML = html;
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Ошибка загрузки данных: ${error.message}
+                </div>
+            `;
+        });
 }
 
-// Управление загрузкой файлов
+// Закрыть информацию о пользователе
+function closeUserInfo() {
+    document.getElementById('userInfoPopup').classList.remove('active');
+}
+
+// Перейти к полям пользователя
+function viewUserFields(userId) {
+    // Закрываем попап
+    closeUserInfo();
+    
+    // Перенаправляем на страницу полей с фильтром по пользователю
+    window.location.href = `/admin/fields?user=${userId}`;
+}
+
+// Закрытие по нажатию ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeUserInfo();
+    }
+});
+
+// Управление выбором всех колонок
 document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.getElementById('importFile');
-    const fileUploadArea = document.getElementById('fileUploadArea');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileName = document.getElementById('fileName');
-    const fileSize = document.getElementById('fileSize');
-    
-    if (fileInput && fileUploadArea) {
-        // Клик по области загрузки
-        fileUploadArea.addEventListener('click', function() {
-            fileInput.click();
-        });
-        
-        // Перетаскивание файла
-        fileUploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#47866A';
-            this.style.backgroundColor = '#f0f9ff';
-        });
-        
-        fileUploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#cbd5e1';
-            this.style.backgroundColor = 'white';
-        });
-        
-        fileUploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.style.borderColor = '#cbd5e1';
-            this.style.backgroundColor = 'white';
-            
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                updateFileInfo();
-            }
-        });
-        
-        // Изменение файла через input
-        fileInput.addEventListener('change', updateFileInfo);
-    }
-    
-    function updateFileInfo() {
-        if (fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            fileInfo.style.display = 'block';
-            fileUploadArea.style.display = 'none';
-        }
-    }
-    
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-    
     // Выбор всех колонок в экспорте
     const columnsGrid = document.querySelector('.columns-grid');
     if (columnsGrid) {
@@ -2324,32 +1992,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
-
-// Остальные функции
-document.addEventListener('DOMContentLoaded', function() {
-    // Поиск и фильтры
-    const searchInput = document.querySelector('.search-input');
-    const filterSelects = document.querySelectorAll('.filter-select');
     
     // Авто-поиск при изменении фильтров
+    const filterSelects = document.querySelectorAll('.filter-select');
+    
     filterSelects.forEach(select => {
         select.addEventListener('change', function() {
             this.closest('form').submit();
         });
-    });
-    
-    // Подтверждение удаления
-    const deleteForms = document.querySelectorAll('.action-form');
-    deleteForms.forEach(form => {
-        const btn = form.querySelector('.delete-btn');
-        if (btn) {
-            btn.addEventListener('click', function(e) {
-                if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-                    e.preventDefault();
-                }
-            });
-        }
     });
     
     // Анимация для статистики
@@ -2363,16 +2013,9 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.transform = 'translateY(0)';
         });
     });
-});
-
-function removeFile() {
-    const fileInput = document.getElementById('importFile');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileUploadArea = document.getElementById('fileUploadArea');
     
-    fileInput.value = '';
-    fileInfo.style.display = 'none';
-    fileUploadArea.style.display = 'block';
-}
+    // Закрытие попапа при клике на оверлей
+    document.querySelector('.popup-overlay').addEventListener('click', closeUserInfo);
+});
 </script>
 @endsection

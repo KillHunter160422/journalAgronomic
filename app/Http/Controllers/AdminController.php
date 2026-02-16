@@ -410,144 +410,7 @@ class AdminController extends Controller
         
         php_session_set('roles', $roles);
     }
-    
-    // --- МЕТОДЫ ЭКСПОРТА И ИМПОРТА ---
-    
-    /**
-     * Экспорт пользователей
-     */
-    public function exportUsers(Request $request)
-    {
-        if (!php_auth_check() || !php_auth_is_admin()) {
-            abort(403, 'Доступ запрещен.');
-        }
-        
-        $query = DB::table('users as u')
-            ->select(
-                'u.user_id',
-                'u.username',
-                'u.email',
-                'u.fullname',
-                'u.created_at',
-                DB::raw('(SELECT COUNT(*) FROM fields WHERE user_id = u.user_id) as fields_count')
-            );
-        
-        // Применяем текущие фильтры из запроса
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('u.username', 'like', "%{$search}%")
-                  ->orWhere('u.email', 'like', "%{$search}%")
-                  ->orWhere('u.fullname', 'like', "%{$search}%");
-            });
-        }
-        
-        if ($request->has('role') && $request->role) {
-            $query->whereExists(function ($q) use ($request) {
-                $q->select(DB::raw(1))
-                  ->from('user_role_assignments')
-                  ->whereRaw('user_role_assignments.user_id = u.user_id')
-                  ->where('user_role_assignments.role_id', $request->role);
-            });
-        }
-        
-        if ($request->has('status') && $request->status) {
-            if ($request->status === 'active') {
-                $query->where('u.is_active', 1);
-            } elseif ($request->status === 'inactive') {
-                $query->where('u.is_active', 0);
-            }
-        }
-        
-        // Дополнительные фильтры из панели экспорта
-        if ($request->has('filters')) {
-            $filters = (array) $request->input('filters');
-            
-            if (in_array('with_fields', $filters)) {
-                $query->whereExists(function ($q) {
-                    $q->select(DB::raw(1))
-                      ->from('fields')
-                      ->whereRaw('fields.user_id = u.user_id');
-                });
-            }
-            
-            if (in_array('with_roles', $filters)) {
-                $query->whereExists(function ($q) {
-                    $q->select(DB::raw(1))
-                      ->from('user_role_assignments')
-                      ->whereRaw('user_role_assignments.user_id = u.user_id');
-                });
-            }
-            
-            if (in_array('active_only', $filters)) {
-                $query->where('u.is_active', 1);
-            }
-        }
-        
-        $users = $query->get();
-        
-        // Получаем роли для каждого пользователя
-        foreach ($users as $user) {
-            $roles = DB::table('user_role_assignments as ura')
-                ->join('user_roles as ur', 'ura.role_id', '=', 'ur.role_id')
-                ->where('ura.user_id', $user->user_id)
-                ->pluck('ur.role_name')
-                ->toArray();
-            
-            $user->roles = implode(', ', $roles);
-        }
-        
-        // Выбранные колонки
-        $columns = $request->input('columns', ['id', 'username', 'email', 'created_at']);
-        $format = $request->input('format', 'csv');
-        
-        // Подготовка данных для экспорта
-        $exportData = [];
-        foreach ($users as $user) {
-            $row = [];
-            
-            if (in_array('id', $columns)) {
-                $row['ID'] = $user->user_id;
-            }
-            
-            if (in_array('username', $columns)) {
-                $row['Имя пользователя'] = $user->username;
-            }
-            
-            if (in_array('email', $columns)) {
-                $row['Email'] = $user->email;
-            }
-            
-            if (in_array('fullname', $columns)) {
-                $row['Полное имя'] = $user->fullname ?? '-';
-            }
-            
-            if (in_array('roles', $columns)) {
-                $row['Роли'] = $user->roles ?? '-';
-            }
-            
-            if (in_array('created_at', $columns)) {
-                $row['Дата регистрации'] = date('d.m.Y H:i', strtotime($user->created_at));
-            }
-            
-            if (in_array('fields_count', $columns)) {
-                $row['Количество полей'] = $user->fields_count;
-            }
-            
-            $exportData[] = $row;
-        }
-        
-        $filename = 'users_export_' . date('Y-m-d_H-i-s') . '.' . $format;
-        
-        if ($format === 'excel') {
-            return $this->exportToExcel($exportData, $filename);
-        } elseif ($format === 'pdf') {
-            return $this->exportToPDF($exportData, $filename);
-        } else {
-            return $this->exportToCSV($exportData, $filename);
-        }
-    }
-    
+
     /**
      * Импорт пользователей
      */
@@ -730,19 +593,148 @@ class AdminController extends Controller
      */
     private function importFromExcel($file, $skipDuplicates, $assignDefaultRole)
     {
-        // Для работы с Excel установите пакет PhpSpreadsheet или Maatwebsite/Excel
-        // В данном примере используем простую CSV-совместимую реализацию
         
         $tmpPath = $file->getPathname();
         $extension = $file->getClientOriginalExtension();
         
         if ($extension === 'xlsx' || $extension === 'xls') {
             // Конвертируем в CSV для простоты
-            // Для полной реализации рекомендуется использовать PhpSpreadsheet
             throw new \Exception('Импорт из Excel файлов требует установки дополнительных библиотек');
         }
         
         return $this->importFromCSV($file, $skipDuplicates, $assignDefaultRole);
+    }
+    
+    public function exportUsers(Request $request)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
+        }
+        
+        $query = DB::table('users as u')
+            ->select(
+                'u.user_id',
+                'u.username',
+                'u.email',
+                'u.fullname',
+                'u.created_at',
+                DB::raw('(SELECT COUNT(*) FROM fields WHERE user_id = u.user_id) as fields_count')
+            );
+        
+        // Применяем текущие фильтры из запроса
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('u.username', 'like', "%{$search}%")
+                  ->orWhere('u.email', 'like', "%{$search}%")
+                  ->orWhere('u.fullname', 'like', "%{$search}%");
+            });
+        }
+        
+        if ($request->has('role') && $request->role) {
+            $query->whereExists(function ($q) use ($request) {
+                $q->select(DB::raw(1))
+                  ->from('user_role_assignments')
+                  ->whereRaw('user_role_assignments.user_id = u.user_id')
+                  ->where('user_role_assignments.role_id', $request->role);
+            });
+        }
+        
+        if ($request->has('status') && $request->status) {
+            if ($request->status === 'active') {
+                $query->where('u.is_active', 1);
+            } elseif ($request->status === 'inactive') {
+                $query->where('u.is_active', 0);
+            }
+        }
+        
+        // Дополнительные фильтры из панели экспорта
+        if ($request->has('filters')) {
+            $filters = (array) $request->input('filters');
+            
+            if (in_array('with_fields', $filters)) {
+                $query->whereExists(function ($q) {
+                    $q->select(DB::raw(1))
+                      ->from('fields')
+                      ->whereRaw('fields.user_id = u.user_id');
+                });
+            }
+            
+            if (in_array('active_only', $filters)) {
+                $query->where('u.is_active', 1);
+            }
+        }
+        
+        $users = $query->get();
+        
+        // Выбранные колонки
+        $columns = $request->input('columns', ['id', 'username', 'email', 'created_at', 'fields_count', 'total_area', 'field_details']);
+        $format = $request->input('format', 'csv');
+        
+        // Подготовка данных для экспорта
+        $exportData = [];
+        foreach ($users as $user) {
+            $row = [];
+            
+            // Получаем поля пользователя
+            $fields = DB::table('fields')
+                ->where('user_id', $user->user_id)
+                ->select('field_name', 'field_area')
+                ->get();
+            
+            $totalArea = $fields->sum('field_area');
+            $fieldDetails = '';
+            
+            foreach ($fields as $field) {
+                $fieldDetails .= $field->field_name . ': ' . number_format($field->field_area, 2) . ' га; ';
+            }
+            
+            $fieldDetails = rtrim($fieldDetails, '; ');
+            
+            if (in_array('id', $columns)) {
+                $row['ID пользователя'] = $user->user_id;
+            }
+            
+            if (in_array('username', $columns)) {
+                $row['Имя пользователя'] = $user->username;
+            }
+            
+            if (in_array('email', $columns)) {
+                $row['Email'] = $user->email;
+            }
+            
+            if (in_array('fullname', $columns)) {
+                $row['Полное имя'] = $user->fullname ?? '-';
+            }
+            
+            if (in_array('created_at', $columns)) {
+                $row['Дата регистрации'] = date('d.m.Y H:i', strtotime($user->created_at));
+            }
+            
+            if (in_array('fields_count', $columns)) {
+                $row['Количество полей'] = $fields->count();
+            }
+            
+            if (in_array('total_area', $columns)) {
+                $row['Общая площадь (га)'] = number_format($totalArea, 2);
+            }
+            
+            if (in_array('field_details', $columns)) {
+                $row['Детали полей'] = $fieldDetails ?: 'Нет полей';
+            }
+            
+            $exportData[] = $row;
+        }
+        
+        $filename = 'users_export_' . date('Y-m-d_H-i-s') . '.' . $format;
+        
+        if ($format === 'excel') {
+            return $this->exportToExcel($exportData, $filename);
+        } elseif ($format === 'pdf') {
+            return $this->exportToPDF($exportData, $filename);
+        } else {
+            return $this->exportToCSV($exportData, $filename);
+        }
     }
     
     /**
@@ -854,8 +846,192 @@ class AdminController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
         
-        // Для реального PDF потребуется библиотека типа Dompdf
-        // В этом примере возвращаем HTML с указанием типа PDF
+        // возвращаем HTML с указанием типа PDF
         return response($html, 200, $headers);
     }
+    // Создать новую роль
+    public function storeRole(Request $request)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
+        }
+        
+        $validated = $request->validate([
+            'role_name' => 'required|string|max:50|unique:user_roles,role_name',
+        ]);
+        
+        DB::table('user_roles')->insert([
+            'role_name' => $validated['role_name'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        
+        return redirect()->route('admin.roles')->with('success', 'Роль создана');
+    }
+    
+    // Обновить роль (метод PUT/PATCH)
+    public function updateRole(Request $request, $roleId)
+    {
+        if (!php_auth_check() || !php_auth_is_admin()) {
+            abort(403, 'Доступ запрещен.');
+        }
+        
+        $validated = $request->validate([
+            'role_name' => 'required|string|max:50|unique:user_roles,role_name,' . $roleId . ',role_id',
+        ]);
+        
+        // Нельзя изменять системные роли
+        $systemRoles = ['admin', 'user'];
+        $role = DB::table('user_roles')->where('role_id', $roleId)->first();
+        
+        if ($role && in_array($role->role_name, $systemRoles)) {
+            return redirect()->back()->with('error', 'Нельзя изменить системную роль');
+        }
+        
+        DB::table('user_roles')->where('role_id', $roleId)->update([
+            'role_name' => $validated['role_name'],
+            'updated_at' => now(),
+        ]);
+        
+        return redirect()->route('admin.roles')->with('success', 'Роль обновлена');
+    }
+
+/**
+ * Получить информацию о пользователе для AJAX
+ */
+public function getUserInfo($userId)
+{
+    if (!php_auth_check() || !php_auth_is_admin()) {
+        abort(403, 'Доступ запрещен.');
+    }
+    
+    $user = DB::table('users')->where('user_id', $userId)->first();
+    
+    if (!$user) {
+        return response('<div class="alert alert-danger">Пользователь не найден</div>');
+    }
+    
+    // Получаем роли пользователя
+    $roles = DB::table('user_role_assignments as ura')
+        ->join('user_roles as ur', 'ura.role_id', '=', 'ur.role_id')
+        ->where('ura.user_id', $userId)
+        ->pluck('ur.role_name')
+        ->toArray();
+    
+    // Получаем поля пользователя
+    $fields = DB::table('fields')
+        ->where('user_id', $userId)
+        ->select('field_id', 'field_name', 'field_area')
+        ->get();
+    
+    $fieldCount = $fields->count();
+    $totalArea = $fields->sum('field_area');
+    
+    $html = '
+    <div class="user-info-content">
+        <div class="user-avatar">
+            ' . ($user->avatar_url ? 
+                '<img src="' . $user->avatar_url . '" alt="' . $user->username . '" class="user-avatar-img">' : 
+                '<div class="user-avatar-default">' . strtoupper(substr($user->username, 0, 2)) . '</div>'
+            ) . '
+        </div>
+        
+        <div class="user-basic-info">
+            <h4 class="user-name">' . htmlspecialchars($user->username) . '</h4>
+            <p class="user-email">' . htmlspecialchars($user->email) . '</p>
+            <span class="user-id-badge">ID: ' . $user->user_id . '</span>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-user-tag"></i>
+                    Полное имя
+                </div>
+                <div class="info-value">' . ($user->fullname ? htmlspecialchars($user->fullname) : 'Не указано') . '</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-calendar-alt"></i>
+                    Дата регистрации
+                </div>
+                <div class="info-value">' . date('d.m.Y H:i:s', strtotime($user->created_at)) . '</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-shield-alt"></i>
+                    Роли
+                </div>
+                <div class="info-value">
+                    <div class="roles-tags">';
+    
+    if (!empty($roles)) {
+        foreach ($roles as $role) {
+            $roleClass = $role == 'admin' ? 'admin' : ($role == 'moderator' ? 'moderator' : 'user');
+            $html .= '<span class="role-tag ' . $roleClass . '">' . $role . '</span>';
+        }
+    } else {
+        $html .= '<span class="text-muted">Нет ролей</span>';
+    }
+    
+    $html .= '
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-map-marked-alt"></i>
+                    Количество полей
+                </div>
+                <div class="info-value">' . $fieldCount . '</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-ruler-combined"></i>
+                    Общая площадь
+                </div>
+                <div class="info-value">' . number_format($totalArea, 2) . ' га</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">
+                    <i class="fas fa-list"></i>
+                    Список полей
+                </div>
+                <div class="info-value">';
+    
+    if ($fields->count() > 0) {
+        $html .= '<div class="fields-list">';
+        foreach ($fields as $field) {
+            $html .= '
+                <div class="field-item">
+                    <a href="/field/' . $field->field_id . '" class="field-link" target="_blank" title="Открыть поле">
+                        <span class="field-name">' . htmlspecialchars($field->field_name) . '</span>
+                        <span class="field-area">' . number_format($field->field_area, 2) . ' га</span>
+                    </a>
+                </div>';
+        }
+        $html .= '</div>
+                <div class="view-all-fields">
+                    <button onclick="viewUserFields(' . $userId . ')" class="view-fields-btn">
+                        <i class="fas fa-external-link-alt me-1"></i>
+                        Просмотреть все поля в панели админа
+                    </button>
+                </div>';
+    } else {
+        $html .= '<div class="no-fields">Нет полей</div>';
+    }
+    
+    $html .= '
+                </div>
+            </div>
+        </div>
+    </div>';
+    
+    return response($html);
+}
 }

@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Field;
 use Illuminate\Http\Request;
 use \Illuminate\Support\Facades\DB;
+use \Illuminate\Support\Facades\Log;
 
 class FieldController extends Controller
 {
     // Показать список полей (журнал)
     public function index()
     {
-        return view('journal'); // ваш blade файл
+        return view('journal');
     }
     
     // Показать форму создания поля
@@ -104,7 +105,49 @@ public function show($id)
         ->orderBy('survey_date', 'desc')
         ->get();
     
-    return view('fields.show', compact('field', 'owner', 'operations', 'surveys', 'lastActivity'));
+    // Получаем информацию о культуре
+    $crop_info = $this->getCropInfo($id);
+    
+    return view('fields.show', compact('field', 'owner', 'operations', 'surveys', 'lastActivity', 'crop_info'));
+}
+
+/**
+ * Получить информацию о культуре для поля
+ */
+private function getCropInfo($fieldId)
+{
+    try {
+        $cropData = DB::table('fields_has_operation as fho')
+            ->leftJoin('crops_catalog as cc', 'fho.crop_id', '=', 'cc.crop_id')
+            ->where('fho.field_id', $fieldId)
+            ->orderBy('fho.created_at', 'desc')
+            ->select(
+                'cc.crop_name', 
+                'cc.variety', 
+                'cc.vegetation_period', 
+                'fho.season_name'  // Добавляем season_name из fields_has_operation
+            )
+            ->first();
+
+        if ($cropData) {
+            return [
+                'crop_name' => $cropData->crop_name ?? null,
+                'variety' => $cropData->variety ?? null,
+                'vegetation_period' => $cropData->vegetation_period ?? null,
+                'season_name' => $cropData->season_name ?? null  // Теперь есть в массиве
+            ];
+        }
+    } catch (\Exception $e) {
+        // Если таблицы нет или произошла ошибка
+        Log::error('Error getting crop info: ' . $e->getMessage());
+    }
+
+    return [
+        'crop_name' => null,
+        'variety' => null,
+        'vegetation_period' => null,
+        'season_name' => null
+    ];
 }
 public function togglePrivacy($id)
 {
@@ -133,7 +176,6 @@ public function togglePrivacy($id)
             : 'Поле теперь приватное'
     );
 }
-// Получить дату последнего действия на поле
 // Получить дату последнего действия на поле
 private function getLastActivityDate($fieldId)
 {
